@@ -1,0 +1,980 @@
+---
+import { supabase } from '../../../lib/supabase';
+
+const user = Astro.locals.user;
+const { id } = Astro.params;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+if (!id) {
+  return Astro.redirect('/history');
+}
+
+// Obtener el workout existente
+const { data: workout, error: workoutError } = await supabase
+  .from('workouts')
+  .select(`
+    id,
+    workout_date,
+    notes,
+    exercise_history (
+      id,
+      exercise_id,
+      weight,
+      reps,
+      sets,
+      variant_equipment,
+      variant_grip,
+      variant_position,
+      exercises (
+        id,
+        name,
+        muscle_group
+      )
+    )
+  `)
+  .eq('id', id)
+  .eq('user_id', user.id)
+  .single();
+
+if (workoutError || !workout) {
+  return Astro.redirect('/history');
+}
+
+// Obtener todos los ejercicios
+const { data: exercises } = await supabase
+  .from('exercises')
+  .select('*')
+  .order('muscle_group', { ascending: true })
+  .order('name', { ascending: true });
+
+// Agrupar ejercicios por grupo muscular
+const exercisesByGroup = exercises?.reduce((acc, ex) => {
+  if (!acc[ex.muscle_group]) {
+    acc[ex.muscle_group] = [];
+  }
+  acc[ex.muscle_group].push(ex);
+  return acc;
+}, {} as Record<string, typeof exercises>) || {};
+
+const muscleGroups = Object.keys(exercisesByGroup);
+
+// Opciones de variantes
+const equipmentOptions = ['Barra', 'Mancuernas', 'Máquina', 'Polea', 'Peso Corporal', 'Kettlebell', 'Banda'];
+const gripOptions = ['Prono', 'Supino', 'Neutro', 'Ancho', 'Cerrado', 'Mixto'];
+const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostado'];
+
+// Procesar exercise_history para agrupar por ejercicio+variantes
+const exercisesMap = new Map();
+workout.exercise_history?.forEach((hist: any) => {
+  const key = `${hist.exercise_id}-${hist.variant_equipment || ''}-${hist.variant_grip || ''}-${hist.variant_position || ''}`;
+
+  if (!exercisesMap.has(key)) {
+    exercisesMap.set(key, {
+      id: hist.exercise_id,
+      name: hist.exercises?.name || '',
+      muscle: hist.exercises?.muscle_group || '',
+      equipment: hist.variant_equipment || '',
+      grip: hist.variant_grip || '',
+      position: hist.variant_position || '',
+      sets: []
+    });
+  }
+
+  exercisesMap.get(key).sets.push({
+    weight: hist.weight,
+    reps: hist.reps,
+    historyId: hist.id
+  });
+});
+
+const workoutExercisesData = Array.from(exercisesMap.values());
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editar Entrenamiento - GymApp</title>
+  <link rel="stylesheet" href="/src/styles/global.css">
+  <style is:global>
+    .app-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .back-btn {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: var(--space-3);
+    }
+
+    .btn-save {
+      padding: var(--space-2) var(--space-5);
+      background: var(--accent-green);
+      color: var(--bg-primary);
+      border: none;
+      border-radius: 6px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-save:hover {
+      opacity: 0.9;
+    }
+
+    .btn-save:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: calc(100vh - 60px);
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Sidebar */
+    .exercise-sidebar {
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: var(--space-5);
+    }
+
+    @media (max-width: 900px) {
+      .exercise-sidebar {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        width: 80%;
+        max-width: 320px;
+        height: calc(100vh - 60px);
+        transform: translateX(-100%);
+        transition: transform var(--transition-normal);
+        z-index: 50;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+      }
+
+      .exercise-sidebar.open {
+        transform: translateX(0);
+      }
+    }
+
+    .sidebar-title {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-4);
+    }
+
+    .search-box {
+      width: 100%;
+      padding: var(--space-2) var(--space-3);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      margin-bottom: var(--space-4);
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--accent-green);
+    }
+
+    .muscle-group {
+      margin-bottom: var(--space-4);
+    }
+
+    .muscle-group-title {
+      font-family: var(--font-display);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-2);
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .exercise-item {
+      padding: var(--space-2) var(--space-3);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-bottom: var(--space-1);
+    }
+
+    .exercise-item:hover {
+      background: var(--bg-secondary);
+    }
+
+    .exercise-name {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+    }
+
+    /* Workout area */
+    .workout-area {
+      padding: var(--space-6);
+      overflow-y: auto;
+    }
+
+    .workout-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-6);
+    }
+
+    .workout-info h1 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-2);
+    }
+
+    .date-selector {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: var(--space-2);
+    }
+
+    .date-selector label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .date-input {
+      padding: var(--space-2) var(--space-3);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+    }
+
+    .date-input:focus {
+      outline: none;
+      border-color: var(--accent-green);
+    }
+
+    .empty-workout {
+      text-align: center;
+      padding: var(--space-8);
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      opacity: 0.3;
+      margin-bottom: var(--space-4);
+    }
+
+    .empty-text {
+      font-size: 0.875rem;
+    }
+
+    /* Exercise cards in workout */
+    .workout-exercise {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: var(--space-4);
+      overflow: hidden;
+    }
+
+    .exercise-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-4);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .exercise-title {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      letter-spacing: 1px;
+    }
+
+    .exercise-muscle {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .exercise-header-buttons {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .btn-favorite {
+      padding: var(--space-1) var(--space-2);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-favorite:hover {
+      border-color: var(--accent-orange);
+      color: var(--accent-orange);
+    }
+
+    .btn-favorite.favorited {
+      background: rgba(255, 159, 10, 0.15);
+      border-color: var(--accent-orange);
+      color: var(--accent-orange);
+    }
+
+    .btn-remove {
+      padding: var(--space-1) var(--space-2);
+      background: var(--accent-red-soft);
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      border-radius: 4px;
+      color: var(--accent-red);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-remove:hover {
+      background: rgba(255, 59, 48, 0.2);
+      border-color: var(--accent-red);
+    }
+
+    .variants-section {
+      padding: var(--space-4);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .variants-title {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-3);
+    }
+
+    .variants-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+    }
+
+    @media (max-width: 600px) {
+      .variants-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .variant-group label {
+      display: block;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-bottom: var(--space-1);
+    }
+
+    .variant-select {
+      width: 100%;
+      padding: var(--space-2);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 0.75rem;
+    }
+
+    .variant-select:focus {
+      outline: none;
+      border-color: var(--accent-green);
+    }
+
+    .sets-container {
+      padding: var(--space-4);
+    }
+
+    .sets-header {
+      display: grid;
+      grid-template-columns: 60px 1fr 1fr 40px;
+      gap: var(--space-3);
+      margin-bottom: var(--space-2);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .set-row {
+      display: grid;
+      grid-template-columns: 60px 1fr 1fr 40px;
+      gap: var(--space-3);
+      align-items: center;
+      margin-bottom: var(--space-2);
+    }
+
+    .set-number {
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .set-input {
+      padding: var(--space-2);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      text-align: center;
+    }
+
+    .set-input:focus {
+      outline: none;
+      border-color: var(--accent-green);
+    }
+
+    .btn-delete-set {
+      padding: var(--space-1);
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .btn-delete-set:hover {
+      color: var(--accent-red);
+    }
+
+    .btn-add-set {
+      width: 100%;
+      padding: var(--space-3);
+      background: transparent;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-top: var(--space-3);
+    }
+
+    .btn-add-set:hover {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    /* Mobile toggle */
+    .mobile-toggle {
+      display: none;
+      position: fixed;
+      bottom: var(--space-6);
+      right: var(--space-6);
+      padding: var(--space-4);
+      background: var(--accent-green);
+      color: var(--bg-primary);
+      border: none;
+      border-radius: 50%;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 40;
+      box-shadow: 0 4px 12px rgba(48, 209, 88, 0.3);
+    }
+
+    @media (max-width: 900px) {
+      .mobile-toggle {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <a href="/history" class="back-btn">← Volver</a>
+      <span class="page-title">EDITAR ENTRENAMIENTO</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn-save" id="saveBtn">Guardar Cambios</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="exercise-sidebar" id="sidebar">
+      <div class="sidebar-title">Agregar Ejercicios</div>
+      <input type="text" class="search-box" placeholder="Buscar ejercicio..." id="searchBox">
+
+      {muscleGroups.map((group) => (
+        <div class="muscle-group" data-group={group}>
+          <div class="muscle-group-title">{group}</div>
+          {exercisesByGroup[group].map((ex) => (
+            <div
+              class="exercise-item"
+              data-id={ex.id}
+              data-name={ex.name}
+              data-muscle={ex.muscle_group}
+            >
+              <div class="exercise-name">{ex.name}</div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </aside>
+
+    <section class="workout-area">
+      <div class="workout-header">
+        <div class="workout-info">
+          <h1>EDITAR ENTRENAMIENTO</h1>
+          <div class="date-selector">
+            <label for="workoutDate">Fecha:</label>
+            <input type="date" id="workoutDate" class="date-input" value={workout.workout_date} />
+          </div>
+        </div>
+      </div>
+
+      <div id="workoutExercises"></div>
+    </section>
+  </main>
+
+  <button class="mobile-toggle" id="mobileToggle">+</button>
+
+  <script define:vars={{ exercises, equipmentOptions, gripOptions, positionOptions, workoutExercisesData, workoutId: id }}>
+    // Estado del entrenamiento
+    let workoutExercises = workoutExercisesData || [];
+    let userFavorites = [];
+
+    // Elementos DOM
+    const exerciseItems = document.querySelectorAll('.exercise-item');
+    const workoutContainer = document.getElementById('workoutExercises');
+    const saveBtn = document.getElementById('saveBtn');
+    const dateEl = document.getElementById('workoutDate');
+    const searchBox = document.getElementById('searchBox');
+    const sidebar = document.getElementById('sidebar');
+    const mobileToggle = document.getElementById('mobileToggle');
+
+    // Cargar favoritos del usuario
+    async function loadFavorites() {
+      try {
+        const response = await fetch('/api/favorites');
+        if (response.ok) {
+          userFavorites = await response.json();
+        }
+      } catch (err) {
+        console.error('Error cargando favoritos:', err);
+      }
+    }
+
+    // Verificar si un ejercicio+variante está en favoritos
+    function isFavorited(exerciseId, equipment, grip, position) {
+      return userFavorites.some(fav =>
+        fav.exercise_id === exerciseId &&
+        (fav.variant_equipment || null) === (equipment || null) &&
+        (fav.variant_grip || null) === (grip || null) &&
+        (fav.variant_position || null) === (position || null)
+      );
+    }
+
+    // Obtener ID de favorito si existe
+    function getFavoriteId(exerciseId, equipment, grip, position) {
+      const fav = userFavorites.find(f =>
+        f.exercise_id === exerciseId &&
+        (f.variant_equipment || null) === (equipment || null) &&
+        (f.variant_grip || null) === (grip || null) &&
+        (f.variant_position || null) === (position || null)
+      );
+      return fav?.id;
+    }
+
+    // Agregar favorito
+    async function addFavorite(exerciseId, equipment, grip, position) {
+      try {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exercise_id: exerciseId,
+            variant_equipment: equipment || null,
+            variant_grip: grip || null,
+            variant_position: position || null
+          })
+        });
+
+        if (response.ok) {
+          const newFav = await response.json();
+          userFavorites.push(newFav);
+          return true;
+        }
+      } catch (err) {
+        console.error('Error agregando favorito:', err);
+      }
+      return false;
+    }
+
+    // Eliminar favorito
+    async function removeFavorite(favoriteId) {
+      try {
+        const response = await fetch(`/api/favorites?id=${favoriteId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          userFavorites = userFavorites.filter(f => f.id !== favoriteId);
+          return true;
+        }
+      } catch (err) {
+        console.error('Error eliminando favorito:', err);
+      }
+      return false;
+    }
+
+    // Cargar favoritos al inicio
+    loadFavorites();
+
+    // Busqueda de ejercicios
+    searchBox.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      document.querySelectorAll('.exercise-item').forEach(item => {
+        const name = item.dataset.name.toLowerCase();
+        const visible = name.includes(query);
+        item.style.display = visible ? 'block' : 'none';
+      });
+
+      document.querySelectorAll('.muscle-group').forEach(group => {
+        const hasVisible = Array.from(group.querySelectorAll('.exercise-item')).some(
+          item => item.style.display !== 'none'
+        );
+        group.style.display = hasVisible ? 'block' : 'none';
+      });
+    });
+
+    // Mobile toggle
+    mobileToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+    });
+
+    // Agregar ejercicio al workout
+    exerciseItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const exerciseId = item.dataset.id;
+        const exerciseName = item.dataset.name;
+        const exerciseMuscle = item.dataset.muscle;
+
+        const exercise = {
+          id: exerciseId,
+          name: exerciseName,
+          muscle: exerciseMuscle,
+          equipment: '',
+          grip: '',
+          position: '',
+          sets: [{ weight: '', reps: '' }]
+        };
+
+        workoutExercises.push(exercise);
+        renderWorkout();
+
+        // Cerrar sidebar en mobile
+        sidebar.classList.remove('open');
+      });
+    });
+
+    // Renderizar workout
+    function renderWorkout() {
+      if (workoutExercises.length === 0) {
+        workoutContainer.innerHTML = '<div class="empty-workout"><div class="empty-icon">+</div><p class="empty-text">Selecciona ejercicios de la barra lateral<br>para agregar al entrenamiento</p></div>';
+        return;
+      }
+
+      // Limpiar y re-renderizar
+      workoutContainer.innerHTML = '';
+
+      workoutExercises.forEach((exercise, exIndex) => {
+        // Actualizar estado de favorito
+        exercise.isFavorite = isFavorited(exercise.id, exercise.equipment, exercise.grip, exercise.position);
+
+        const card = document.createElement('div');
+        card.className = 'workout-exercise';
+        card.innerHTML = `
+          <div class="exercise-header">
+            <div>
+              <div class="exercise-title">${exercise.name}</div>
+              <div class="exercise-muscle">${exercise.muscle}</div>
+            </div>
+            <div class="exercise-header-buttons">
+              <button type="button" class="btn-favorite ${exercise.isFavorite ? 'favorited' : ''}" data-index="${exIndex}">
+                ${exercise.isFavorite ? '★' : '☆'}
+              </button>
+              <button type="button" class="btn-remove" data-index="${exIndex}">Quitar</button>
+            </div>
+          </div>
+          <div class="variants-section">
+            <div class="variants-title">Variantes (opcional)</div>
+            <div class="variants-grid">
+              <div class="variant-group">
+                <label>Equipo</label>
+                <select class="variant-select" data-ex="${exIndex}" data-field="equipment">
+                  <option value="">-</option>
+                  ${equipmentOptions.map(opt => `<option value="${opt}" ${exercise.equipment === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                </select>
+              </div>
+              <div class="variant-group">
+                <label>Agarre</label>
+                <select class="variant-select" data-ex="${exIndex}" data-field="grip">
+                  <option value="">-</option>
+                  ${gripOptions.map(opt => `<option value="${opt}" ${exercise.grip === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                </select>
+              </div>
+              <div class="variant-group">
+                <label>Posición</label>
+                <select class="variant-select" data-ex="${exIndex}" data-field="position">
+                  <option value="">-</option>
+                  ${positionOptions.map(opt => `<option value="${opt}" ${exercise.position === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="sets-container">
+            <div class="sets-header">
+              <span>Serie</span>
+              <span>Peso (kg)</span>
+              <span>Reps</span>
+              <span></span>
+            </div>
+            ${exercise.sets.map((set, setIndex) => `
+              <div class="set-row">
+                <span class="set-number">${setIndex + 1}</span>
+                <input
+                  type="number"
+                  class="set-input weight-input"
+                  placeholder="0"
+                  value="${set.weight}"
+                  data-ex="${exIndex}"
+                  data-set="${setIndex}"
+                  data-field="weight"
+                >
+                <input
+                  type="number"
+                  class="set-input reps-input"
+                  placeholder="0"
+                  value="${set.reps}"
+                  data-ex="${exIndex}"
+                  data-set="${setIndex}"
+                  data-field="reps"
+                >
+                <button type="button" class="btn-delete-set" data-ex="${exIndex}" data-set="${setIndex}">×</button>
+              </div>
+            `).join('')}
+            <button type="button" class="btn-add-set" data-ex="${exIndex}">+ Agregar Serie</button>
+          </div>
+        `;
+        workoutContainer.appendChild(card);
+      });
+
+      // Event listeners para variantes
+      document.querySelectorAll('.variant-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const exIndex = parseInt(e.target.dataset.ex);
+          const field = e.target.dataset.field;
+          workoutExercises[exIndex][field] = e.target.value;
+          // Re-render para actualizar estado de favorito
+          renderWorkout();
+        });
+      });
+
+      // Event listeners para inputs
+      document.querySelectorAll('.set-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const exIndex = parseInt(e.target.dataset.ex);
+          const setIndex = parseInt(e.target.dataset.set);
+          const field = e.target.dataset.field;
+          workoutExercises[exIndex].sets[setIndex][field] = e.target.value;
+        });
+      });
+
+      // Event listeners para agregar serie
+      document.querySelectorAll('.btn-add-set').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const exIndex = parseInt(e.target.dataset.ex);
+          workoutExercises[exIndex].sets.push({ weight: '', reps: '' });
+          renderWorkout();
+        });
+      });
+
+      // Event listeners para eliminar serie
+      document.querySelectorAll('.btn-delete-set').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const exIndex = parseInt(e.target.dataset.ex);
+          const setIndex = parseInt(e.target.dataset.set);
+          if (workoutExercises[exIndex].sets.length > 1) {
+            workoutExercises[exIndex].sets.splice(setIndex, 1);
+            renderWorkout();
+          }
+        });
+      });
+
+      // Event listeners para quitar ejercicio
+      document.querySelectorAll('.btn-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const exIndex = parseInt(e.target.dataset.index);
+          workoutExercises.splice(exIndex, 1);
+          renderWorkout();
+        });
+      });
+
+      // Event listeners para favoritos
+      document.querySelectorAll('.btn-favorite').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const exIndex = parseInt(e.target.dataset.index);
+          const exercise = workoutExercises[exIndex];
+
+          if (exercise.isFavorite) {
+            // Quitar de favoritos
+            const favId = getFavoriteId(exercise.id, exercise.equipment, exercise.grip, exercise.position);
+            if (favId) {
+              const success = await removeFavorite(favId);
+              if (success) {
+                renderWorkout();
+              }
+            }
+          } else {
+            // Agregar a favoritos
+            const success = await addFavorite(exercise.id, exercise.equipment, exercise.grip, exercise.position);
+            if (success) {
+              renderWorkout();
+            }
+          }
+        });
+      });
+    }
+
+    // Renderizar al cargar
+    renderWorkout();
+
+    // Guardar cambios
+    saveBtn.addEventListener('click', async () => {
+      if (workoutExercises.length === 0) {
+        alert('Agrega al menos un ejercicio con series');
+        return;
+      }
+
+      const hasValidSets = workoutExercises.some(ex =>
+        ex.sets.some(set => set.weight && set.reps)
+      );
+
+      if (!hasValidSets) {
+        alert('Agrega al menos una serie con peso y repeticiones');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Guardando...';
+
+      const workoutData = {
+        workout_date: dateEl.value,
+        exercises: workoutExercises.map(ex => ({
+          exercise_id: ex.id,
+          equipment: ex.equipment || null,
+          grip: ex.grip || null,
+          position: ex.position || null,
+          sets: ex.sets.filter(s => s.weight && s.reps).map(s => ({
+            weight: parseFloat(s.weight),
+            reps: parseInt(s.reps)
+          }))
+        })).filter(ex => ex.sets.length > 0)
+      };
+
+      try {
+        const response = await fetch(`/api/workouts?id=${workoutId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workoutData)
+        });
+
+        if (response.ok) {
+          window.location.href = '/history';
+        } else {
+          const data = await response.json();
+          alert(data.message || 'Error al guardar los cambios');
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Guardar Cambios';
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        alert('Error al guardar los cambios');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Guardar Cambios';
+      }
+    });
+  </script>
+</body>
+</html>

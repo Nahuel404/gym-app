@@ -1,0 +1,561 @@
+---
+import { supabase } from '../lib/supabase';
+
+const user = Astro.locals.user;
+
+// Obtener workouts del usuario
+const { data: workoutsData, error } = await supabase
+  .from('workouts')
+  .select(`
+    id,
+    workout_date,
+    notes,
+    exercise_history (
+      id,
+      weight,
+      reps,
+      variant_equipment,
+      variant_grip,
+      variant_position,
+      exercises (
+        id,
+        name,
+        muscle_group
+      )
+    )
+  `)
+  .eq('user_id', user?.id)
+  .order('workout_date', { ascending: false });
+
+const workoutDays = workoutsData?.map(workout => {
+  const date = new Date(workout.workout_date);
+  const exercises = workout.exercise_history || [];
+  const totalVolume = exercises.reduce((acc, e) => acc + (e.weight * e.reps), 0);
+  const uniqueExercises = [...new Set(exercises.map(e => e.exercises?.id))].length;
+
+  // Agrupar ejercicios por ejercicio + variantes
+  const exercisesGrouped = new Map<string, typeof exercises>();
+  exercises.forEach(e => {
+    const exId = e.exercises?.id || 'unknown';
+    const variantKey = `${exId}-${e.variant_equipment || ''}-${e.variant_grip || ''}-${e.variant_position || ''}`;
+    if (!exercisesGrouped.has(variantKey)) {
+      exercisesGrouped.set(variantKey, []);
+    }
+    exercisesGrouped.get(variantKey)!.push(e);
+  });
+
+  return {
+    id: workout.id,
+    date: workout.workout_date,
+    formattedDate: date.toLocaleDateString('es-ES', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long'
+    }),
+    totalVolume,
+    exerciseCount: uniqueExercises,
+    setCount: exercises.length,
+    exercises: Array.from(exercisesGrouped.entries()).map(([key, sets]) => {
+      const variants = [];
+      if (sets[0].variant_equipment) variants.push(sets[0].variant_equipment);
+      if (sets[0].variant_grip) variants.push(sets[0].variant_grip);
+      if (sets[0].variant_position) variants.push(sets[0].variant_position);
+
+      return {
+        id: key,
+        name: sets[0].exercises?.name || 'Ejercicio',
+        muscle: sets[0].exercises?.muscle_group || '',
+        variant: variants.length > 0 ? variants.join(' · ') : '',
+        sets: sets.map(s => ({
+          weight: s.weight,
+          reps: s.reps
+        }))
+      };
+    })
+  };
+}) || [];
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial - GymApp</title>
+  <link rel="stylesheet" href="/src/styles/global.css">
+  <style>
+    .app-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .back-btn {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .header-btn {
+      padding: var(--space-2) var(--space-4);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-decoration: none;
+      transition: all var(--transition-fast);
+      border: 1px solid var(--border-light);
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .header-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    main {
+      padding: var(--space-6);
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .page-header {
+      margin-bottom: var(--space-6);
+    }
+
+    .page-header h1 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    /* Stats summary */
+    .stats-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    @media (max-width: 600px) {
+      .stats-summary { grid-template-columns: 1fr; }
+    }
+
+    .stat-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: var(--space-4);
+      text-align: center;
+    }
+
+    .stat-box-value {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--accent-green);
+      margin-bottom: var(--space-1);
+    }
+
+    .stat-box-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Workout day cards */
+    .workout-day {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: var(--space-4);
+      overflow: hidden;
+    }
+
+    .day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-4);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+
+    .day-header:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .day-date {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      letter-spacing: 1px;
+      text-transform: capitalize;
+    }
+
+    .day-stats {
+      display: flex;
+      gap: var(--space-4);
+    }
+
+    .day-stat {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .day-stat span {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .day-volume {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      color: var(--accent-green);
+    }
+
+    .day-toggle {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      transition: transform var(--transition-fast);
+    }
+
+    .workout-day.open .day-toggle {
+      transform: rotate(180deg);
+    }
+
+    .day-actions {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .btn-edit, .btn-delete-workout {
+      padding: var(--space-1) var(--space-2);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .btn-edit:hover {
+      border-color: var(--accent-orange);
+      color: var(--accent-orange);
+      background: rgba(255, 159, 10, 0.1);
+    }
+
+    .btn-delete-workout:hover {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      background: var(--accent-red-soft);
+    }
+
+    /* Exercise details */
+    .day-content {
+      display: none;
+      padding: var(--space-4);
+    }
+
+    .workout-day.open .day-content {
+      display: block;
+    }
+
+    .exercise-block {
+      margin-bottom: var(--space-4);
+    }
+
+    .exercise-block:last-child {
+      margin-bottom: 0;
+    }
+
+    .exercise-name {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .exercise-variant {
+      font-size: 0.7rem;
+      color: var(--accent-orange);
+      margin-bottom: var(--space-1);
+    }
+
+    .exercise-muscle {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-3);
+    }
+
+    .sets-grid {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .set-chip {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: var(--space-2) var(--space-3);
+      font-size: 0.75rem;
+    }
+
+    .set-chip .weight {
+      font-family: var(--font-display);
+      color: var(--text-primary);
+    }
+
+    .set-chip .reps {
+      color: var(--text-muted);
+      margin-left: var(--space-1);
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-8);
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      opacity: 0.3;
+      margin-bottom: var(--space-4);
+    }
+
+    .empty-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      margin-bottom: var(--space-2);
+      color: var(--text-primary);
+    }
+
+    .empty-text {
+      font-size: 0.875rem;
+      margin-bottom: var(--space-6);
+    }
+
+    .quick-action {
+      padding: var(--space-3) var(--space-5);
+      background: var(--text-primary);
+      color: var(--text-dark);
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition-normal);
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .quick-action:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <a href="/" class="back-btn">← Volver</a>
+      <span class="page-title">HISTORIAL</span>
+    </div>
+    <div class="header-actions">
+      <a href="/favorites" class="header-btn">Favoritos</a>
+      <a href="/workout/new" class="header-btn">Nuevo</a>
+    </div>
+  </header>
+
+  <main>
+    {workoutDays.length > 0 ? (
+      <>
+        <div class="page-header">
+          <h1>HISTORIAL DE ENTRENAMIENTOS</h1>
+          <p>Revisa tu progreso y entrenamientos anteriores</p>
+        </div>
+
+        <div class="stats-summary">
+          <div class="stat-box">
+            <div class="stat-box-value">{workoutDays.length}</div>
+            <div class="stat-box-label">Dias Entrenados</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-value">{workoutDays.reduce((acc, d) => acc + d.setCount, 0)}</div>
+            <div class="stat-box-label">Series Totales</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-value">
+              {((workoutDays.reduce((acc, d) => acc + d.totalVolume, 0)) / 1000).toFixed(1)}t
+            </div>
+            <div class="stat-box-label">Volumen Total</div>
+          </div>
+        </div>
+
+        {workoutDays.map((day, index) => (
+          <div class={`workout-day ${index === 0 ? 'open' : ''}`} data-day={day.date} data-id={day.id}>
+            <div class="day-header">
+              <div>
+                <div class="day-date">{day.formattedDate}</div>
+                <div class="day-stats">
+                  <span class="day-stat"><span>{day.exerciseCount}</span> ejercicios</span>
+                  <span class="day-stat"><span>{day.setCount}</span> series</span>
+                </div>
+              </div>
+              <div class="day-actions">
+                <button type="button" class="btn-edit" data-id={day.id}>Editar</button>
+                <button type="button" class="btn-delete-workout" data-id={day.id}>Eliminar</button>
+                <div class="day-volume">{(day.totalVolume / 1000).toFixed(1)}t</div>
+                <span class="day-toggle">v</span>
+              </div>
+            </div>
+            <div class="day-content">
+              {day.exercises.map((exercise) => (
+                <div class="exercise-block">
+                  <div class="exercise-name">{exercise.name}</div>
+                  {exercise.variant && <div class="exercise-variant">{exercise.variant}</div>}
+                  <div class="exercise-muscle">{exercise.muscle}</div>
+                  <div class="sets-grid">
+                    {exercise.sets.map((set, setIndex) => (
+                      <div class="set-chip">
+                        <span class="weight">{set.weight}kg</span>
+                        <span class="reps">x{set.reps}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </>
+    ) : (
+      <div class="empty-state">
+        <div class="empty-icon">◇</div>
+        <h2 class="empty-title">SIN HISTORIAL</h2>
+        <p class="empty-text">
+          Aun no tienes entrenamientos registrados.<br>
+          Comienza a trackear tu progreso.
+        </p>
+        <a href="/workout/new" class="quick-action">
+          + Primer Entrenamiento
+        </a>
+      </div>
+    )}
+  </main>
+
+  <script>
+    // Toggle de día
+    document.querySelectorAll('.day-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        // No toggle si se clickeó un botón
+        if (e.target.closest('button')) return;
+
+        const day = header.closest('.workout-day');
+        day?.classList.toggle('open');
+      });
+    });
+
+    // Eliminar workout
+    document.querySelectorAll('.btn-delete-workout').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const workoutId = e.target.dataset.id;
+
+        if (!confirm('¿Estás seguro de eliminar este entrenamiento? Esta acción no se puede deshacer.')) {
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Eliminando...';
+
+        try {
+          const response = await fetch(`/api/workouts?id=${workoutId}`, {
+            method: 'DELETE'
+          });
+
+          if (response.ok) {
+            // Remover del DOM
+            const workoutDay = document.querySelector(`[data-id="${workoutId}"]`);
+            if (workoutDay) {
+              workoutDay.remove();
+            }
+            // Recargar para actualizar estadísticas
+            setTimeout(() => window.location.reload(), 500);
+          } else {
+            const data = await response.json();
+            alert(data.message || 'Error al eliminar el entrenamiento');
+            btn.disabled = false;
+            btn.textContent = 'Eliminar';
+          }
+        } catch (err) {
+          console.error('Error:', err);
+          alert('Error al eliminar el entrenamiento');
+          btn.disabled = false;
+          btn.textContent = 'Eliminar';
+        }
+      });
+    });
+
+    // Editar workout
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const workoutId = e.target.dataset.id;
+        window.location.href = `/workout/edit/${workoutId}`;
+      });
+    });
+  </script>
+</body>
+</html>

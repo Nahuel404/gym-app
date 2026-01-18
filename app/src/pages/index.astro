@@ -1,0 +1,754 @@
+---
+import LineChart from '../components/charts/LineChart.astro';
+import BarChart from '../components/charts/BarChart.astro';
+import ProgressRing from '../components/charts/ProgressRing.astro';
+import StatCard from '../components/charts/StatCard.astro';
+import { supabase } from '../lib/supabase';
+
+const user = Astro.locals.user;
+
+// Obtener workouts del usuario
+const { data: workoutsData } = await supabase
+  .from('workouts')
+  .select(`
+    id,
+    workout_date,
+    exercise_history (
+      id,
+      weight,
+      reps,
+      variant_equipment,
+      variant_grip,
+      variant_position,
+      exercises (
+        id,
+        name,
+        muscle_group
+      )
+    )
+  `)
+  .eq('user_id', user?.id)
+  .order('workout_date', { ascending: false });
+
+// Obtener favoritos del usuario
+const { data: favoritesData } = await supabase
+  .from('user_favorite_exercises')
+  .select(`
+    id,
+    exercise_id,
+    variant_equipment,
+    variant_grip,
+    variant_position,
+    exercises (
+      id,
+      name,
+      muscle_group
+    )
+  `)
+  .eq('user_id', user?.id);
+
+const hasData = workoutsData && workoutsData.length > 0;
+
+// Flatten all exercise history for calculations
+const historyData = workoutsData?.flatMap(w => w.exercise_history || []) || [];
+
+// Calcular estadisticas
+const now = new Date();
+const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+const totalWorkouts = workoutsData?.length || 0;
+const totalVolume = historyData.reduce((acc, h) => acc + (h.weight * h.reps), 0);
+
+// Entrenamientos esta semana
+const thisWeek = workoutsData?.filter(w => {
+  const date = new Date(w.workout_date);
+  return date >= oneWeekAgo;
+}).length || 0;
+
+// Calcular racha actual
+let currentStreak = 0;
+const sortedWorkouts = workoutsData
+  ?.map(w => new Date(w.workout_date))
+  .sort((a, b) => b.getTime() - a.getTime()) || [];
+
+if (sortedWorkouts.length > 0) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let checkDate = new Date(today);
+
+  for (const workoutDate of sortedWorkouts) {
+    const wd = new Date(workoutDate);
+    wd.setHours(0, 0, 0, 0);
+
+    const diff = Math.floor((checkDate.getTime() - wd.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (diff <= 1) {
+      currentStreak++;
+      checkDate = wd;
+    } else {
+      break;
+    }
+  }
+}
+
+const stats = {
+  totalWorkouts,
+  totalVolume,
+  currentStreak,
+  thisWeek,
+};
+
+// Volumen por grupo muscular (ultimo mes)
+const volumeByMuscleMap = new Map<string, number>();
+workoutsData?.forEach(workout => {
+  const workoutDate = new Date(workout.workout_date);
+  if (workoutDate >= oneMonthAgo) {
+    workout.exercise_history?.forEach(h => {
+      if (h.exercises) {
+        const muscle = h.exercises.muscle_group;
+        const volume = h.weight * h.reps;
+        volumeByMuscleMap.set(muscle, (volumeByMuscleMap.get(muscle) || 0) + volume);
+      }
+    });
+  }
+});
+
+const volumeByMuscle = Array.from(volumeByMuscleMap.entries())
+  .map(([label, value]) => ({ label, value }))
+  .sort((a, b) => b.value - a.value)
+  .slice(0, 5);
+
+// Ultimos entrenamientos
+const recentWorkouts = workoutsData?.slice(0, 4).map(workout => {
+  const date = new Date(workout.workout_date);
+  const dateStr = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  const exercises = workout.exercise_history || [];
+  const uniqueExercises = new Set(exercises.map(e => e.exercises?.id)).size;
+  const volume = exercises.reduce((acc, e) => acc + (e.weight * e.reps), 0);
+  return {
+    date: dateStr,
+    exercises: uniqueExercises,
+    volume,
+    duration: '-'
+  };
+}) || [];
+
+// Helper para crear clave única de ejercicio + variantes
+const getExerciseKey = (h: any) => {
+  if (!h.exercises) return '';
+  const variants = [];
+  if (h.variant_equipment) variants.push(h.variant_equipment);
+  if (h.variant_grip) variants.push(h.variant_grip);
+  if (h.variant_position) variants.push(h.variant_position);
+  return variants.length > 0
+    ? `${h.exercises.name} (${variants.join(' · ')})`
+    : h.exercises.name;
+};
+
+// Records personales (peso maximo por ejercicio+variante)
+const prByExercise = new Map<string, { weight: number; date: Date; name: string }>();
+workoutsData?.forEach(workout => {
+  const workoutDate = new Date(workout.workout_date);
+  workout.exercise_history?.forEach(h => {
+    if (h.exercises) {
+      const key = getExerciseKey(h);
+      const current = prByExercise.get(key);
+      if (!current || h.weight > current.weight) {
+        prByExercise.set(key, {
+          weight: h.weight,
+          date: workoutDate,
+          name: key
+        });
+      }
+    }
+  });
+});
+
+const personalRecords = Array.from(prByExercise.values())
+  .sort((a, b) => b.weight - a.weight)
+  .slice(0, 3)
+  .map(pr => ({
+    exercise: pr.name,
+    weight: pr.weight,
+    date: pr.date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+  }));
+
+// Helper para crear clave de favorito
+const getFavoriteKey = (fav: any) => {
+  if (!fav.exercises) return '';
+  const variants = [];
+  if (fav.variant_equipment) variants.push(fav.variant_equipment);
+  if (fav.variant_grip) variants.push(fav.variant_grip);
+  if (fav.variant_position) variants.push(fav.variant_position);
+  return variants.length > 0
+    ? `${fav.exercises.name} (${variants.join(' · ')})`
+    : fav.exercises.name;
+};
+
+// Comparar si un historial coincide con un favorito
+const matchesFavorite = (h: any, fav: any) => {
+  return h.exercises?.id === fav.exercise_id &&
+    (h.variant_equipment || null) === (fav.variant_equipment || null) &&
+    (h.variant_grip || null) === (fav.variant_grip || null) &&
+    (h.variant_position || null) === (fav.variant_position || null);
+};
+
+// Datos para grafico de progreso (ejercicios favoritos)
+const colors = ['#30d158', '#ff9f0a', '#0a84ff', '#bf5af2', '#ff453a'];
+const progressSeries: Array<{ name: string; data: { label: string; value: number }[]; color: string }> = [];
+
+if (favoritesData && favoritesData.length > 0) {
+  favoritesData.forEach((fav, index) => {
+    const favKey = getFavoriteKey(fav);
+
+    // Obtener últimos 8 workouts que contengan este favorito
+    const workoutsWithFavorite = workoutsData
+      ?.filter(w => w.exercise_history?.some(h => matchesFavorite(h, fav)))
+      .slice(-8) || [];
+
+    if (workoutsWithFavorite.length > 0) {
+      const data = workoutsWithFavorite.map((w, i) => {
+        // Tomar el peso máximo de ese ejercicio+variante en ese workout
+        const exerciseSets = w.exercise_history?.filter(h => matchesFavorite(h, fav)) || [];
+        const maxWeight = Math.max(...exerciseSets.map(s => s.weight));
+        return {
+          label: `W${i + 1}`,
+          value: maxWeight
+        };
+      });
+
+      progressSeries.push({
+        name: favKey,
+        data,
+        color: colors[index % colors.length]
+      });
+    }
+  });
+}
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - GymApp</title>
+  <link rel="stylesheet" href="/src/styles/global.css">
+  <style>
+    .app-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .logo-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .user-name {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .header-btn {
+      padding: var(--space-2) var(--space-4);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-decoration: none;
+      transition: all var(--transition-fast);
+      border: 1px solid var(--border-light);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .header-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .btn-logout {
+      background: var(--accent-red-soft);
+      border-color: rgba(255, 59, 48, 0.3);
+      color: var(--accent-red);
+    }
+
+    .btn-logout:hover {
+      background: rgba(255, 59, 48, 0.2);
+      border-color: var(--accent-red);
+    }
+
+    main {
+      padding: var(--space-6);
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-6);
+    }
+
+    .welcome-text h1 {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-2);
+    }
+
+    .welcome-text p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .quick-action {
+      padding: var(--space-3) var(--space-5);
+      background: var(--text-primary);
+      color: var(--text-dark);
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition-normal);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      text-decoration: none;
+    }
+
+    .quick-action:hover {
+      opacity: 0.9;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    @media (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Dashboard Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: var(--space-6);
+      margin-bottom: var(--space-6);
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Section */
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--space-5);
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-link {
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      letter-spacing: 1px;
+    }
+
+    .section-link:hover {
+      color: var(--text-secondary);
+    }
+
+    /* Progress Rings */
+    .rings-container {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: var(--space-4) 0;
+    }
+
+    /* Recent Workouts */
+    .workout-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .workout-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: all var(--transition-fast);
+    }
+
+    .workout-item:hover {
+      border-color: var(--border-light);
+      background: var(--bg-tertiary);
+    }
+
+    .workout-date {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      min-width: 60px;
+    }
+
+    .workout-info {
+      display: flex;
+      gap: var(--space-4);
+      flex: 1;
+      justify-content: center;
+    }
+
+    .workout-stat {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .workout-stat span {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .workout-volume {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      color: var(--accent-green);
+      min-width: 70px;
+      text-align: right;
+    }
+
+    /* PRs */
+    .pr-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .pr-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .pr-exercise {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+    }
+
+    .pr-weight {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      color: var(--accent-orange);
+    }
+
+    .pr-date {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-8);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: var(--space-4);
+      opacity: 0.3;
+    }
+
+    .empty-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      margin-bottom: var(--space-2);
+    }
+
+    .empty-text {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-bottom: var(--space-6);
+    }
+
+    /* Bottom Grid */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-6);
+    }
+
+    @media (max-width: 1024px) {
+      .bottom-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Empty Chart */
+    .empty-chart {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">
+      GYMAPP
+      <span class="logo-dot"></span>
+    </div>
+    <div class="header-actions">
+      <span class="user-name">{user?.name}</span>
+      <a href="/favorites" class="header-btn">Favoritos</a>
+      <a href="/history" class="header-btn">Historial</a>
+      {user?.role === 'admin' && (
+        <a href="/admin/users" class="header-btn">Usuarios</a>
+      )}
+      <button class="header-btn btn-logout" id="logoutBtn">Salir</button>
+    </div>
+  </header>
+
+  <main>
+    {hasData ? (
+      <>
+        <div class="dashboard-header">
+          <div class="welcome-text">
+            <h1>DASHBOARD</h1>
+            <p>Resumen de tu progreso</p>
+          </div>
+          <a href="/workout/new" class="quick-action">
+            + Nuevo Entrenamiento
+          </a>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+          <StatCard
+            value={stats.totalWorkouts}
+            label="Entrenamientos"
+            icon="fire"
+          />
+          <StatCard
+            value={(stats.totalVolume / 1000).toFixed(1)}
+            unit="t"
+            label="Volumen Total"
+            change={12}
+            icon="weight"
+          />
+          <StatCard
+            value={stats.currentStreak}
+            label="Racha Actual"
+            unit="dias"
+            icon="up"
+          />
+          <StatCard
+            value={stats.thisWeek}
+            label="Esta Semana"
+            unit="/5"
+            icon="time"
+          />
+        </div>
+
+        <!-- Main Charts -->
+        <div class="dashboard-grid">
+          {progressSeries.length > 0 ? (
+            <LineChart
+              title="Progreso - Favoritos"
+              series={progressSeries}
+              unit="kg"
+              showArea={true}
+              width={420}
+              height={210}
+            />
+          ) : (
+            <div class="section">
+              <div class="section-title">Progreso</div>
+              <div class="empty-chart">
+                <p>Marca ejercicios como favoritos para ver tu progreso</p>
+              </div>
+            </div>
+          )}
+
+          <div class="section">
+            <div class="section-title">Objetivos Semanales</div>
+            <div class="rings-container">
+              <ProgressRing
+                value={stats.thisWeek}
+                max={5}
+                size={100}
+                label="Sesiones"
+                sublabel={`${stats.thisWeek} de 5`}
+                color="green"
+              />
+              <ProgressRing
+                value={stats.totalWorkouts > 0 ? Math.min(100, Math.round((stats.thisWeek / 5) * 100)) : 0}
+                max={100}
+                size={100}
+                label="Meta"
+                sublabel={`${stats.totalWorkouts > 0 ? Math.min(100, Math.round((stats.thisWeek / 5) * 100)) : 0}%`}
+                color="orange"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Volume Chart + Recent -->
+        <div class="dashboard-grid">
+          {volumeByMuscle.length > 0 ? (
+            <BarChart
+              title="Volumen por Grupo Muscular (mes)"
+              data={volumeByMuscle}
+              unit="kg"
+              showValues={true}
+              width={420}
+              height={210}
+            />
+          ) : (
+            <div class="section">
+              <div class="section-title">Volumen por Grupo Muscular</div>
+              <div class="empty-chart">
+                <p>Sin datos este mes</p>
+              </div>
+            </div>
+          )}
+
+          <div class="section">
+            <div class="section-title">
+              Ultimos Entrenamientos
+              <a href="/history" class="section-link">Ver todos</a>
+            </div>
+            {recentWorkouts.length > 0 ? (
+              <div class="workout-list">
+                {recentWorkouts.map((w) => (
+                  <div class="workout-item">
+                    <div class="workout-date">{w.date}</div>
+                    <div class="workout-info">
+                      <span class="workout-stat"><span>{w.exercises}</span> ejerc.</span>
+                    </div>
+                    <div class="workout-volume">{(w.volume / 1000).toFixed(1)}t</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div class="empty-chart">
+                <p>Sin entrenamientos recientes</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <!-- PRs Section -->
+        {personalRecords.length > 0 && (
+          <div class="bottom-grid">
+            <div class="section">
+              <div class="section-title">Records Personales</div>
+              <div class="pr-list">
+                {personalRecords.map((pr) => (
+                  <div class="pr-item">
+                    <div>
+                      <div class="pr-exercise">{pr.exercise}</div>
+                      <div class="pr-date">{pr.date}</div>
+                    </div>
+                    <div class="pr-weight">{pr.weight}kg</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    ) : (
+      <div class="empty-state">
+        <div class="empty-icon">◇</div>
+        <h2 class="empty-title">BIENVENIDO</h2>
+        <p class="empty-text">
+          Aun no tienes entrenamientos registrados.<br>
+          Comienza a trackear tu progreso.
+        </p>
+        <a href="/workout/new" class="quick-action">
+          + Primer Entrenamiento
+        </a>
+      </div>
+    )}
+  </main>
+
+  <script>
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      window.location.href = '/login'
+    })
+  </script>
+</body>
+</html>

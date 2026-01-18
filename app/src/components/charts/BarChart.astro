@@ -1,0 +1,302 @@
+---
+interface DataPoint {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+interface Props {
+  data: DataPoint[];
+  title?: string;
+  width?: number;
+  height?: number;
+  showValues?: boolean;
+  horizontal?: boolean;
+  unit?: string;
+}
+
+const {
+  data,
+  title,
+  width = 600,
+  height = 300,
+  showValues = true,
+  horizontal = false,
+  unit = '',
+} = Astro.props;
+
+const padding = horizontal
+  ? { top: 20, right: 60, bottom: 30, left: 80 }
+  : { top: 20, right: 20, bottom: 50, left: 50 };
+const chartWidth = width - padding.left - padding.right;
+const chartHeight = height - padding.top - padding.bottom;
+
+const maxValue = Math.max(...data.map((d) => d.value));
+const minValue = 0;
+const valueRange = maxValue - minValue || 1;
+
+const chartId = `bar-${Math.random().toString(36).substr(2, 9)}`;
+
+// Theme colors
+const themeColors = [
+  '#30d158', // green
+  '#ff9500', // orange
+  '#ff3b30', // red
+  '#ffffff', // white
+  '#a0a0a0', // gray
+];
+
+const barGap = 0.3;
+const barWidth = horizontal ? chartHeight / data.length : chartWidth / data.length;
+const actualBarWidth = barWidth * (1 - barGap);
+
+const scaleValue = (value: number) => {
+  return ((value - minValue) / valueRange) * (horizontal ? chartWidth : chartHeight);
+};
+
+const tickCount = 4;
+const tickStep = valueRange / tickCount;
+const ticks = Array.from({ length: tickCount + 1 }, (_, i) => Math.round(minValue + tickStep * i));
+---
+
+<div class="chart-wrapper">
+  {title && <div class="chart-title">{title}</div>}
+  <svg
+    id={chartId}
+    viewBox={`0 0 ${width} ${height}`}
+    class="bar-chart"
+  >
+    <defs>
+      {data.map((d, i) => {
+        const color = d.color || themeColors[i % themeColors.length];
+        return (
+          <linearGradient id={`${chartId}-grad-${i}`} x1="0%" y1="0%" x2={horizontal ? "100%" : "0%"} y2={horizontal ? "0%" : "100%"}>
+            <stop offset="0%" stop-color={color} stop-opacity="1" />
+            <stop offset="100%" stop-color={color} stop-opacity="0.6" />
+          </linearGradient>
+        );
+      })}
+    </defs>
+
+    <g transform={`translate(${padding.left}, ${padding.top})`}>
+      <!-- Grid -->
+      {ticks.map((tick) => {
+        const pos = horizontal ? scaleValue(tick) : chartHeight - scaleValue(tick);
+        return horizontal ? (
+          <line x1={pos} y1={0} x2={pos} y2={chartHeight} class="grid-line" />
+        ) : (
+          <line x1={0} y1={pos} x2={chartWidth} y2={pos} class="grid-line" />
+        );
+      })}
+
+      <!-- Bars -->
+      {data.map((d, i) => {
+        const barHeight = scaleValue(d.value);
+        const color = d.color || themeColors[i % themeColors.length];
+
+        if (horizontal) {
+          const y = i * barWidth + (barWidth - actualBarWidth) / 2;
+          return (
+            <g class="bar-group">
+              <rect
+                class="bar"
+                x={0}
+                y={y}
+                width={barHeight}
+                height={actualBarWidth}
+                fill={`url(#${chartId}-grad-${i})`}
+                rx="4"
+                data-value={d.value}
+                data-label={d.label}
+              />
+              {showValues && (
+                <text
+                  x={barHeight + 8}
+                  y={y + actualBarWidth / 2}
+                  class="bar-value"
+                  dominant-baseline="middle"
+                >
+                  {d.value}{unit}
+                </text>
+              )}
+            </g>
+          );
+        } else {
+          const x = i * barWidth + (barWidth - actualBarWidth) / 2;
+          const y = chartHeight - barHeight;
+          return (
+            <g class="bar-group">
+              <rect
+                class="bar"
+                x={x}
+                y={y}
+                width={actualBarWidth}
+                height={barHeight}
+                fill={`url(#${chartId}-grad-${i})`}
+                rx="4"
+                data-value={d.value}
+                data-label={d.label}
+              />
+              {showValues && (
+                <text
+                  x={x + actualBarWidth / 2}
+                  y={y - 8}
+                  class="bar-value"
+                  text-anchor="middle"
+                >
+                  {d.value}{unit}
+                </text>
+              )}
+            </g>
+          );
+        }
+      })}
+
+      <!-- Axis Labels -->
+      {horizontal ? (
+        <>
+          {/* Y-axis category labels */}
+          {data.map((d, i) => {
+            const y = i * barWidth + barWidth / 2;
+            return (
+              <text x={-8} y={y} class="axis-label" text-anchor="end" dominant-baseline="middle">
+                {d.label}
+              </text>
+            );
+          })}
+          {/* X-axis value ticks */}
+          {ticks.map((tick) => (
+            <text x={scaleValue(tick)} y={chartHeight + 16} class="axis-label" text-anchor="middle">
+              {tick}{unit}
+            </text>
+          ))}
+        </>
+      ) : (
+        <>
+          {/* Y-axis value ticks */}
+          {ticks.map((tick) => (
+            <text x={-8} y={chartHeight - scaleValue(tick)} class="axis-label" text-anchor="end" dominant-baseline="middle">
+              {tick}
+            </text>
+          ))}
+          {/* X-axis category labels */}
+          {data.map((d, i) => {
+            const x = i * barWidth + barWidth / 2;
+            return (
+              <text x={x} y={chartHeight + 16} class="axis-label" text-anchor="middle">
+                {d.label}
+              </text>
+            );
+          })}
+        </>
+      )}
+    </g>
+
+    <!-- Tooltip -->
+    <g id={`${chartId}-tip`} class="tooltip" visibility="hidden">
+      <rect x="0" y="0" width="90" height="44" rx="4" />
+      <text x="8" y="16" class="tip-label"></text>
+      <text x="8" y="34" class="tip-value"></text>
+    </g>
+  </svg>
+</div>
+
+<script define:vars={{ chartId, unit }}>
+  const svg = document.getElementById(chartId);
+  const tooltip = document.getElementById(`${chartId}-tip`);
+
+  if (svg && tooltip) {
+    const bars = svg.querySelectorAll('.bar');
+
+    bars.forEach((bar) => {
+      bar.addEventListener('mouseenter', (e) => {
+        const t = e.target;
+        const label = t.getAttribute('data-label');
+        const value = t.getAttribute('data-value');
+
+        tooltip.querySelector('.tip-label').textContent = label;
+        tooltip.querySelector('.tip-value').textContent = value + unit;
+
+        const rect = t.getBBox();
+        const x = rect.x + rect.width / 2 - 45;
+        const y = rect.y - 50;
+
+        tooltip.setAttribute('transform', `translate(${x}, ${y})`);
+        tooltip.setAttribute('visibility', 'visible');
+        t.style.filter = 'brightness(1.2)';
+      });
+
+      bar.addEventListener('mouseleave', (e) => {
+        tooltip.setAttribute('visibility', 'hidden');
+        e.target.style.filter = '';
+      });
+    });
+  }
+</script>
+
+<style>
+  .chart-wrapper {
+    background: var(--bg-card, #0f0f0f);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+
+  .chart-title {
+    font-family: var(--font-display, 'Orbitron', sans-serif);
+    font-size: 0.7rem;
+    color: var(--text-muted, #606060);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+  }
+
+  .bar-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .grid-line {
+    stroke: var(--border, #2a2a2a);
+    stroke-width: 1;
+  }
+
+  .bar {
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+
+  .bar:hover {
+    filter: brightness(1.2);
+  }
+
+  .bar-value {
+    font-family: var(--font-display, 'Orbitron', sans-serif);
+    font-size: 11px;
+    fill: var(--text-secondary, #a0a0a0);
+  }
+
+  .axis-label {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 10px;
+    fill: var(--text-muted, #606060);
+  }
+
+  .tooltip rect {
+    fill: var(--bg-tertiary, #1a1a1a);
+    stroke: var(--border-light, #333);
+  }
+
+  .tip-label {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 10px;
+    fill: var(--text-muted, #606060);
+  }
+
+  .tip-value {
+    font-family: var(--font-display, 'Orbitron', sans-serif);
+    font-size: 14px;
+    fill: var(--text-primary, #ffffff);
+  }
+</style>

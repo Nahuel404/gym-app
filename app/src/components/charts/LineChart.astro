@@ -1,0 +1,304 @@
+---
+interface DataSeries {
+  name: string;
+  data: { label: string; value: number }[];
+  color?: string;
+}
+
+interface Props {
+  series: DataSeries[];
+  title?: string;
+  width?: number;
+  height?: number;
+  showPoints?: boolean;
+  showArea?: boolean;
+  curved?: boolean;
+  unit?: string;
+}
+
+const {
+  series,
+  title,
+  width = 600,
+  height = 300,
+  showPoints = true,
+  showArea = true,
+  curved = true,
+  unit = '',
+} = Astro.props;
+
+const padding = { top: 30, right: 20, bottom: 50, left: 50 };
+const chartWidth = width - padding.left - padding.right;
+const chartHeight = height - padding.top - padding.bottom;
+
+const allLabels = [...new Set(series.flatMap((s) => s.data.map((d) => d.label)))];
+const allValues = series.flatMap((s) => s.data.map((d) => d.value));
+const maxValue = Math.max(...allValues);
+const minValue = Math.min(0, ...allValues);
+const valueRange = maxValue - minValue || 1;
+
+const chartId = `line-${Math.random().toString(36).substr(2, 9)}`;
+
+const themeColors = ['#30d158', '#ff9500', '#ff3b30', '#ffffff'];
+
+const scaleX = (index: number) => (index / (allLabels.length - 1 || 1)) * chartWidth;
+const scaleY = (value: number) => chartHeight - ((value - minValue) / valueRange) * chartHeight;
+
+const generatePath = (data: { label: string; value: number }[]) => {
+  const points = data.map((d) => {
+    const labelIndex = allLabels.indexOf(d.label);
+    return { x: scaleX(labelIndex), y: scaleY(d.value) };
+  });
+
+  if (curved && points.length > 2) {
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[Math.max(0, i - 1)];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[Math.min(points.length - 1, i + 2)];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+    return path;
+  } else {
+    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  }
+};
+
+const generateAreaPath = (data: { label: string; value: number }[]) => {
+  const linePath = generatePath(data);
+  const lastIndex = allLabels.indexOf(data[data.length - 1].label);
+  const firstIndex = allLabels.indexOf(data[0].label);
+  return `${linePath} L ${scaleX(lastIndex)} ${chartHeight} L ${scaleX(firstIndex)} ${chartHeight} Z`;
+};
+
+const tickCount = 4;
+const tickStep = valueRange / tickCount;
+const ticks = Array.from({ length: tickCount + 1 }, (_, i) => Math.round(minValue + tickStep * i));
+
+// Pre-calculate data for template
+const areaData = showArea ? series.map((s, i) => ({
+  path: generateAreaPath(s.data),
+  gradId: `${chartId}-grad-${i}`
+})) : [];
+
+const lineData = series.map((s, i) => ({
+  path: generatePath(s.data),
+  color: s.color || themeColors[i % themeColors.length]
+}));
+
+const pointsData = showPoints ? series.flatMap((s, i) => {
+  const color = s.color || themeColors[i % themeColors.length];
+  return s.data.map((d) => {
+    const labelIndex = allLabels.indexOf(d.label);
+    return {
+      cx: scaleX(labelIndex),
+      cy: scaleY(d.value),
+      color,
+      seriesName: s.name,
+      label: d.label,
+      value: d.value
+    };
+  });
+}) : [];
+
+const tickData = ticks.map((tick) => ({
+  y: scaleY(tick),
+  label: `${tick}${unit}`
+}));
+
+const xLabelData = allLabels
+  .map((label, i) => ({ label, x: scaleX(i), show: allLabels.length <= 7 || i % Math.ceil(allLabels.length / 7) === 0 }))
+  .filter(d => d.show);
+
+const showLegend = series.length > 1;
+const legendData = showLegend ? series.map((s, i) => ({
+  color: s.color || themeColors[i % themeColors.length],
+  name: s.name,
+  xOffset: i * 100
+})) : [];
+
+const gradients = series.map((s, i) => ({
+  id: `${chartId}-grad-${i}`,
+  color: s.color || themeColors[i % themeColors.length]
+}));
+---
+
+<div class="chart-wrapper">
+  {title && <div class="chart-title">{title}</div>}
+  <svg id={chartId} viewBox={`0 0 ${width} ${height}`} class="line-chart">
+    <defs>
+      {gradients.map((g) => (
+        <linearGradient id={g.id} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color={g.color} stop-opacity="0.25" />
+          <stop offset="100%" stop-color={g.color} stop-opacity="0" />
+        </linearGradient>
+      ))}
+    </defs>
+
+    <g transform={`translate(${padding.left}, ${padding.top})`}>
+      {tickData.map((t) => (
+        <line x1={0} y1={t.y} x2={chartWidth} y2={t.y} class="grid-line" />
+      ))}
+
+      {areaData.map((a) => (
+        <path d={a.path} fill={`url(#${a.gradId})`} class="area-path" />
+      ))}
+
+      {lineData.map((l) => (
+        <path d={l.path} fill="none" stroke={l.color} stroke-width="2" stroke-linecap="round" class="line-path" />
+      ))}
+
+      {pointsData.map((p) => (
+        <circle
+          cx={p.cx}
+          cy={p.cy}
+          r="4"
+          fill="#0a0a0a"
+          stroke={p.color}
+          stroke-width="2"
+          class="data-point"
+          data-series={p.seriesName}
+          data-label={p.label}
+          data-value={p.value}
+        />
+      ))}
+
+      {tickData.map((t) => (
+        <text x={-8} y={t.y} class="axis-label" text-anchor="end" dominant-baseline="middle">
+          {t.label}
+        </text>
+      ))}
+
+      {xLabelData.map((d) => (
+        <text x={d.x} y={chartHeight + 20} class="axis-label" text-anchor="middle">
+          {d.label}
+        </text>
+      ))}
+    </g>
+
+    {showLegend && (
+      <g transform={`translate(${padding.left}, ${height - 12})`}>
+        {legendData.map((l) => (
+          <g transform={`translate(${l.xOffset}, 0)`}>
+            <circle cx={4} cy={0} r={4} fill={l.color} />
+            <text x={12} y={0} class="legend-text" dominant-baseline="middle">{l.name}</text>
+          </g>
+        ))}
+      </g>
+    )}
+
+    <g id={`${chartId}-tip`} class="tooltip" visibility="hidden">
+      <rect x="0" y="0" width="100" height="44" rx="4" />
+      <text x="8" y="16" class="tip-label"></text>
+      <text x="8" y="34" class="tip-value"></text>
+    </g>
+  </svg>
+</div>
+
+<script define:vars={{ chartId, unit }}>
+  const svg = document.getElementById(chartId);
+  const tooltip = document.getElementById(`${chartId}-tip`);
+
+  if (svg && tooltip) {
+    const points = svg.querySelectorAll('.data-point');
+
+    points.forEach((point) => {
+      point.addEventListener('mouseenter', (e) => {
+        const t = e.target;
+        const label = t.getAttribute('data-label');
+        const value = t.getAttribute('data-value');
+
+        tooltip.querySelector('.tip-label').textContent = label;
+        tooltip.querySelector('.tip-value').textContent = value + unit;
+
+        const cx = parseFloat(t.getAttribute('cx')) + 60;
+        const cy = parseFloat(t.getAttribute('cy')) + 20;
+
+        tooltip.setAttribute('transform', `translate(${cx}, ${cy})`);
+        tooltip.setAttribute('visibility', 'visible');
+        t.setAttribute('r', '6');
+      });
+
+      point.addEventListener('mouseleave', (e) => {
+        tooltip.setAttribute('visibility', 'hidden');
+        e.target.setAttribute('r', '4');
+      });
+    });
+  }
+</script>
+
+<style>
+  .chart-wrapper {
+    background: var(--bg-card, #0f0f0f);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+
+  .chart-title {
+    font-family: var(--font-display, 'Orbitron', sans-serif);
+    font-size: 0.7rem;
+    color: var(--text-muted, #606060);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+  }
+
+  .line-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .grid-line {
+    stroke: var(--border, #2a2a2a);
+    stroke-width: 1;
+  }
+
+  .line-path {
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+
+  .area-path {
+    opacity: 0.8;
+  }
+
+  .data-point {
+    cursor: pointer;
+    transition: r 0.15s ease;
+  }
+
+  .axis-label {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 10px;
+    fill: var(--text-muted, #606060);
+  }
+
+  .legend-text {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 10px;
+    fill: var(--text-secondary, #a0a0a0);
+  }
+
+  .tooltip rect {
+    fill: var(--bg-tertiary, #1a1a1a);
+    stroke: var(--border-light, #333);
+  }
+
+  .tip-label {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 10px;
+    fill: var(--text-muted, #606060);
+  }
+
+  .tip-value {
+    font-family: var(--font-display, 'Orbitron', sans-serif);
+    font-size: 14px;
+    fill: var(--text-primary, #ffffff);
+  }
+</style>

@@ -1,0 +1,593 @@
+---
+import { supabase } from '../lib/supabase';
+
+const user = Astro.locals.user;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// Obtener ejercicios
+const { data: exercises } = await supabase
+  .from('exercises')
+  .select('*')
+  .order('muscle_group', { ascending: true })
+  .order('name', { ascending: true });
+
+// Agrupar ejercicios por grupo muscular
+const exercisesByGroup = exercises?.reduce((acc, ex) => {
+  if (!acc[ex.muscle_group]) {
+    acc[ex.muscle_group] = [];
+  }
+  acc[ex.muscle_group].push(ex);
+  return acc;
+}, {} as Record<string, typeof exercises>) || {};
+
+// Obtener favoritos del usuario
+const { data: favorites } = await supabase
+  .from('user_favorite_exercises')
+  .select(`
+    id,
+    exercise_id,
+    variant_equipment,
+    variant_grip,
+    variant_position,
+    exercises (
+      id,
+      name,
+      muscle_group
+    )
+  `)
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false });
+
+// Opciones de variantes
+const equipmentOptions = ['Barra', 'Mancuernas', 'Máquina', 'Polea', 'Peso Corporal', 'Kettlebell', 'Banda'];
+const gripOptions = ['Prono', 'Supino', 'Neutro', 'Ancho', 'Cerrado', 'Mixto'];
+const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostado'];
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Favoritos - GymApp</title>
+  <link rel="stylesheet" href="/src/styles/global.css">
+  <style>
+    .app-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .back-btn {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: 2px;
+    }
+
+    main {
+      padding: var(--space-6);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .page-header {
+      margin-bottom: var(--space-6);
+    }
+
+    .page-header h1 {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-6);
+    }
+
+    @media (max-width: 900px) {
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--space-5);
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-5);
+    }
+
+    /* Add Form */
+    .form-group {
+      margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-2);
+    }
+
+    .form-select {
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+    }
+
+    .form-select:focus {
+      outline: none;
+      border-color: var(--accent-green);
+    }
+
+    .variants-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-3);
+      margin-top: var(--space-3);
+    }
+
+    @media (max-width: 600px) {
+      .variants-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .btn-add-favorite {
+      width: 100%;
+      padding: var(--space-3) var(--space-4);
+      background: var(--accent-green);
+      color: var(--bg-primary);
+      border: none;
+      border-radius: 6px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-top: var(--space-4);
+    }
+
+    .btn-add-favorite:hover {
+      opacity: 0.9;
+    }
+
+    .btn-add-favorite:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Favorites List */
+    .favorites-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .favorite-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: var(--space-4);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: all var(--transition-fast);
+    }
+
+    .favorite-item:hover {
+      border-color: var(--border-light);
+    }
+
+    .favorite-info {
+      flex: 1;
+    }
+
+    .favorite-name {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-1);
+    }
+
+    .favorite-muscle {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-2);
+    }
+
+    .favorite-variants {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-top: var(--space-2);
+    }
+
+    .variant-tag {
+      padding: var(--space-1) var(--space-2);
+      background: rgba(48, 209, 88, 0.1);
+      border: 1px solid rgba(48, 209, 88, 0.3);
+      border-radius: 4px;
+      font-size: 0.65rem;
+      color: var(--accent-green);
+      letter-spacing: 0.5px;
+    }
+
+    .btn-delete {
+      padding: var(--space-2) var(--space-3);
+      background: var(--accent-red-soft);
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      border-radius: 4px;
+      color: var(--accent-red);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-delete:hover {
+      background: rgba(255, 59, 48, 0.2);
+      border-color: var(--accent-red);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--space-8);
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      opacity: 0.3;
+      margin-bottom: var(--space-4);
+    }
+
+    .empty-text {
+      font-size: 0.875rem;
+    }
+
+    .star-icon {
+      font-size: 1.25rem;
+      color: var(--accent-orange);
+      margin-right: var(--space-2);
+    }
+
+    .message {
+      padding: var(--space-3);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      margin-bottom: var(--space-4);
+      text-align: center;
+    }
+
+    .message.success {
+      background: rgba(48, 209, 88, 0.1);
+      border: 1px solid rgba(48, 209, 88, 0.3);
+      color: var(--accent-green);
+    }
+
+    .message.error {
+      background: rgba(255, 59, 48, 0.1);
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      color: var(--accent-red);
+    }
+
+    .message.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <a href="/" class="back-btn">← Volver</a>
+      <span class="page-title">FAVORITOS</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-header">
+      <h1>EJERCICIOS FAVORITOS</h1>
+      <p>Gestiona los ejercicios que quieres trackear en el dashboard</p>
+    </div>
+
+    <div id="message" class="message hidden"></div>
+
+    <div class="content-grid">
+      <!-- Agregar Favorito -->
+      <div class="section">
+        <div class="section-title">Agregar Favorito</div>
+
+        <form id="addFavoriteForm">
+          <div class="form-group">
+            <label class="form-label">Grupo Muscular</label>
+            <select class="form-select" id="muscleGroupSelect">
+              <option value="">Seleccionar grupo...</option>
+              {Object.keys(exercisesByGroup).map(group => (
+                <option value={group}>{group}</option>
+              ))}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Ejercicio</label>
+            <select class="form-select" id="exerciseSelect" disabled>
+              <option value="">Primero selecciona un grupo</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Variantes (opcional)</label>
+            <div class="variants-grid">
+              <div>
+                <label class="form-label" style="font-size: 0.65rem;">Equipo</label>
+                <select class="form-select" id="equipmentSelect">
+                  <option value="">-</option>
+                  {equipmentOptions.map(opt => (
+                    <option value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.65rem;">Agarre</label>
+                <select class="form-select" id="gripSelect">
+                  <option value="">-</option>
+                  {gripOptions.map(opt => (
+                    <option value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label class="form-label" style="font-size: 0.65rem;">Posición</label>
+                <select class="form-select" id="positionSelect">
+                  <option value="">-</option>
+                  {positionOptions.map(opt => (
+                    <option value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-add-favorite" id="addBtn" disabled>
+            Agregar a Favoritos
+          </button>
+        </form>
+      </div>
+
+      <!-- Lista de Favoritos -->
+      <div class="section">
+        <div class="section-title">Mis Favoritos ({favorites?.length || 0})</div>
+
+        <div class="favorites-list" id="favoritesList">
+          {favorites && favorites.length > 0 ? (
+            favorites.map((fav) => {
+              const variants = [];
+              if (fav.variant_equipment) variants.push(fav.variant_equipment);
+              if (fav.variant_grip) variants.push(fav.variant_grip);
+              if (fav.variant_position) variants.push(fav.variant_position);
+
+              return (
+                <div class="favorite-item" data-id={fav.id}>
+                  <div class="favorite-info">
+                    <div class="favorite-name">
+                      <span class="star-icon">★</span>
+                      {fav.exercises?.name}
+                    </div>
+                    <div class="favorite-muscle">{fav.exercises?.muscle_group}</div>
+                    {variants.length > 0 && (
+                      <div class="favorite-variants">
+                        {variants.map(v => (
+                          <span class="variant-tag">{v}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" class="btn-delete" data-id={fav.id}>
+                    Eliminar
+                  </button>
+                </div>
+              );
+            })
+          ) : (
+            <div class="empty-state">
+              <div class="empty-icon">☆</div>
+              <p class="empty-text">
+                Aún no tienes favoritos.<br>
+                Agrega ejercicios para trackear en el dashboard.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script define:vars={{ exercisesByGroup }}>
+    const muscleGroupSelect = document.getElementById('muscleGroupSelect');
+    const exerciseSelect = document.getElementById('exerciseSelect');
+    const equipmentSelect = document.getElementById('equipmentSelect');
+    const gripSelect = document.getElementById('gripSelect');
+    const positionSelect = document.getElementById('positionSelect');
+    const addBtn = document.getElementById('addBtn');
+    const addForm = document.getElementById('addFavoriteForm');
+    const favoritesList = document.getElementById('favoritesList');
+    const messageEl = document.getElementById('message');
+
+    // Mostrar mensaje
+    function showMessage(text, type) {
+      messageEl.textContent = text;
+      messageEl.className = `message ${type}`;
+      setTimeout(() => {
+        messageEl.className = 'message hidden';
+      }, 3000);
+    }
+
+    // Cambiar grupo muscular
+    muscleGroupSelect.addEventListener('change', (e) => {
+      const group = e.target.value;
+
+      if (!group) {
+        exerciseSelect.disabled = true;
+        exerciseSelect.innerHTML = '<option value="">Primero selecciona un grupo</option>';
+        addBtn.disabled = true;
+        return;
+      }
+
+      const exercises = exercisesByGroup[group] || [];
+      exerciseSelect.disabled = false;
+      exerciseSelect.innerHTML = '<option value="">Seleccionar ejercicio...</option>' +
+        exercises.map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
+      addBtn.disabled = true;
+    });
+
+    // Cambiar ejercicio
+    exerciseSelect.addEventListener('change', (e) => {
+      addBtn.disabled = !e.target.value;
+    });
+
+    // Agregar favorito
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const exerciseId = exerciseSelect.value;
+      if (!exerciseId) return;
+
+      addBtn.disabled = true;
+      addBtn.textContent = 'Agregando...';
+
+      try {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exercise_id: exerciseId,
+            variant_equipment: equipmentSelect.value || null,
+            variant_grip: gripSelect.value || null,
+            variant_position: positionSelect.value || null
+          })
+        });
+
+        if (response.ok) {
+          showMessage('Favorito agregado correctamente', 'success');
+          // Resetear formulario
+          muscleGroupSelect.value = '';
+          exerciseSelect.value = '';
+          exerciseSelect.disabled = true;
+          exerciseSelect.innerHTML = '<option value="">Primero selecciona un grupo</option>';
+          equipmentSelect.value = '';
+          gripSelect.value = '';
+          positionSelect.value = '';
+          // Recargar página para mostrar el nuevo favorito
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          const data = await response.json();
+          showMessage(data.message || 'Error al agregar favorito', 'error');
+          addBtn.disabled = false;
+          addBtn.textContent = 'Agregar a Favoritos';
+        }
+      } catch (err) {
+        showMessage('Error al agregar favorito', 'error');
+        addBtn.disabled = false;
+        addBtn.textContent = 'Agregar a Favoritos';
+      }
+    });
+
+    // Eliminar favorito
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const favoriteId = e.target.dataset.id;
+
+        if (!confirm('¿Eliminar este ejercicio de favoritos?')) return;
+
+        e.target.disabled = true;
+        e.target.textContent = 'Eliminando...';
+
+        try {
+          const response = await fetch(`/api/favorites?id=${favoriteId}`, {
+            method: 'DELETE'
+          });
+
+          if (response.ok) {
+            showMessage('Favorito eliminado correctamente', 'success');
+            // Remover elemento del DOM
+            const item = document.querySelector(`[data-id="${favoriteId}"]`);
+            if (item) {
+              item.remove();
+            }
+            // Recargar después de un momento
+            setTimeout(() => window.location.reload(), 1000);
+          } else {
+            showMessage('Error al eliminar favorito', 'error');
+            e.target.disabled = false;
+            e.target.textContent = 'Eliminar';
+          }
+        } catch (err) {
+          showMessage('Error al eliminar favorito', 'error');
+          e.target.disabled = false;
+          e.target.textContent = 'Eliminar';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

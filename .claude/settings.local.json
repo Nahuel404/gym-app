@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout /t 5)",
+      "Bash(npm run dev)"
+    ]
+  }
+}

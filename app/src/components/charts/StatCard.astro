@@ -1,0 +1,115 @@
+---
+interface Props {
+  value: string | number;
+  label: string;
+  change?: number;
+  unit?: string;
+  icon?: 'up' | 'down' | 'weight' | 'reps' | 'time' | 'fire';
+}
+
+const {
+  value,
+  label,
+  change,
+  unit = '',
+  icon,
+} = Astro.props;
+
+const isPositive = change && change > 0;
+const isNegative = change && change < 0;
+---
+
+<div class="stat-card">
+  <div class="stat-header">
+    <span class="stat-label">{label}</span>
+    {icon && (
+      <span class="stat-icon">
+        {icon === 'up' && '↑'}
+        {icon === 'down' && '↓'}
+        {icon === 'weight' && '◆'}
+        {icon === 'reps' && '×'}
+        {icon === 'time' && '◷'}
+        {icon === 'fire' && '●'}
+      </span>
+    )}
+  </div>
+
+  <div class="stat-value">
+    {value}<span class="stat-unit">{unit}</span>
+  </div>
+
+  {change !== undefined && (
+    <div class={`stat-change ${isPositive ? 'positive' : ''} ${isNegative ? 'negative' : ''}`}>
+      {isPositive && '+'}
+      {change}%
+      <span class="change-label">vs anterior</span>
+    </div>
+  )}
+</div>
+
+<style>
+  .stat-card {
+    background: var(--bg-card, #0f0f0f);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 12px;
+    padding: 1.25rem;
+    min-width: 140px;
+  }
+
+  .stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .stat-label {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 0.65rem;
+    color: var(--text-muted, #606060);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .stat-icon {
+    font-size: 0.875rem;
+    color: var(--text-muted, #606060);
+  }
+
+  .stat-value {
+    font-family: var(--font-display, 'Orbitron', sans-serif);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary, #ffffff);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-unit {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #a0a0a0);
+    margin-left: 0.25rem;
+  }
+
+  .stat-change {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 0.75rem;
+    color: var(--text-muted, #606060);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .stat-change.positive {
+    color: var(--accent-green, #30d158);
+  }
+
+  .stat-change.negative {
+    color: var(--accent-red, #ff3b30);
+  }
+
+  .change-label {
+    font-size: 0.65rem;
+    color: var(--text-muted, #606060);
+  }
+</style>

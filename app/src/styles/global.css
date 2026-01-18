@@ -1,0 +1,332 @@
+/* GYM APP - Global Styles */
+/* Design System: Tech/Space/Console - Nothing Phone inspired */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Base Colors */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #121212;
+  --bg-tertiary: #1a1a1a;
+  --bg-card: #0f0f0f;
+  --border: #2a2a2a;
+  --border-light: #333333;
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-muted: #606060;
+  --text-dark: #0a0a0a;
+
+  /* Accents */
+  --accent-red: #ff3b30;
+  --accent-orange: #ff9500;
+  --accent-green: #30d158;
+  --accent-red-soft: rgba(255, 59, 48, 0.12);
+  --accent-orange-soft: rgba(255, 149, 0, 0.12);
+  --accent-green-soft: rgba(48, 209, 88, 0.12);
+
+  /* Typography */
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Space Grotesk', 'SF Mono', monospace;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+h1 {
+  font-size: 2rem;
+  letter-spacing: 1px;
+}
+
+h2 {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 500;
+}
+
+/* Links */
+a {
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--text-secondary);
+}
+
+/* Buttons */
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.btn {
+  padding: var(--space-3) var(--space-5);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.btn-primary {
+  background: var(--text-primary);
+  color: var(--text-dark);
+  border: none;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--text-muted);
+}
+
+.btn-danger {
+  background: var(--accent-red-soft);
+  color: var(--accent-red);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.btn-danger:hover {
+  background: rgba(255, 59, 48, 0.2);
+  border-color: var(--accent-red);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Inputs */
+input, select, textarea {
+  font-family: var(--font-body);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-4);
+  font-size: 1rem;
+  transition: border-color var(--transition-fast);
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--text-muted);
+}
+
+input::placeholder {
+  color: var(--text-muted);
+}
+
+select {
+  cursor: pointer;
+}
+
+select option {
+  background: var(--bg-secondary);
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: var(--space-5);
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 4px;
+}
+
+.badge-success {
+  background: var(--accent-green-soft);
+  color: var(--accent-green);
+}
+
+.badge-warning {
+  background: var(--accent-orange-soft);
+  color: var(--accent-orange);
+}
+
+.badge-danger {
+  background: var(--accent-red-soft);
+  color: var(--accent-red);
+}
+
+.badge-neutral {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+/* Messages */
+.message {
+  padding: var(--space-3) var(--space-4);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-bottom: var(--space-4);
+}
+
+.message-success {
+  background: var(--accent-green-soft);
+  border: 1px solid rgba(48, 209, 88, 0.3);
+  color: var(--accent-green);
+}
+
+.message-error {
+  background: var(--accent-red-soft);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  color: var(--accent-red);
+}
+
+.message-warning {
+  background: var(--accent-orange-soft);
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  color: var(--accent-orange);
+}
+
+/* Tables */
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 var(--space-2);
+}
+
+.table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-4);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.table td {
+  padding: var(--space-4);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.table td:first-child {
+  border-left: 1px solid var(--border);
+  border-radius: 8px 0 0 8px;
+}
+
+.table td:last-child {
+  border-right: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
+}
+
+.table tr:hover td {
+  background: var(--bg-tertiary);
+  border-color: var(--border-light);
+}
+
+/* Utility Classes */
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-success {
+  color: var(--accent-green);
+}
+
+.text-warning {
+  color: var(--accent-orange);
+}
+
+.text-danger {
+  color: var(--accent-red);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-body);
+}
+
+/* Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--text-muted);
+}
+
+/* Empty State */
+.empty {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--text-muted);
+}

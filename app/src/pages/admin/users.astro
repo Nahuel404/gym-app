@@ -1,0 +1,518 @@
+---
+const user = Astro.locals.user
+
+if (!user || user.role !== 'admin') {
+  return Astro.redirect('/')
+}
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuarios - GymApp</title>
+  <link rel="stylesheet" href="/src/styles/global.css">
+  <style is:global>
+    .app-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .back-link {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: all var(--transition-fast);
+    }
+
+    .back-link:hover {
+      border-color: var(--border-light);
+      color: var(--text-secondary);
+    }
+
+    .logo {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .logo-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
+    }
+
+    main {
+      padding: var(--space-6);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-6);
+    }
+
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--space-5);
+      margin-bottom: var(--space-6);
+    }
+
+    .section-title {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-5);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .form-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .form-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: flex-end;
+      margin-top: var(--space-4);
+    }
+
+    .btn-submit {
+      padding: var(--space-3) var(--space-6);
+      background: var(--text-primary);
+      color: var(--text-dark);
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition-normal);
+    }
+
+    .btn-submit:hover { opacity: 0.9; }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .message {
+      padding: var(--space-3) var(--space-4);
+      border-radius: 8px;
+      margin-bottom: var(--space-4);
+      font-size: 0.875rem;
+    }
+
+    .message-success {
+      background: var(--accent-green-soft);
+      border: 1px solid rgba(48, 209, 88, 0.3);
+      color: var(--accent-green);
+    }
+
+    .message-error {
+      background: var(--accent-red-soft);
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      color: var(--accent-red);
+    }
+
+    /* Users Table */
+    .users-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 var(--space-2);
+    }
+
+    .users-table th {
+      text-align: left;
+      padding: var(--space-2) var(--space-4);
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .users-table td {
+      padding: var(--space-4);
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      transition: all var(--transition-fast);
+    }
+
+    .users-table td:first-child {
+      border-left: 1px solid var(--border);
+      border-radius: 8px 0 0 8px;
+    }
+
+    .users-table td:last-child {
+      border-right: 1px solid var(--border);
+      border-radius: 0 8px 8px 0;
+    }
+
+    .users-table tr:hover td {
+      background: var(--bg-tertiary);
+      border-color: var(--border-light);
+    }
+
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+    }
+
+    .avatar-admin {
+      background: var(--accent-orange-soft);
+      color: var(--accent-orange);
+      border: 1px solid rgba(255, 149, 0, 0.3);
+    }
+
+    .avatar-user {
+      background: var(--bg-tertiary);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .user-info strong {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .user-info span {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: var(--space-1) var(--space-2);
+      border-radius: 4px;
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .badge-admin {
+      background: var(--accent-orange-soft);
+      color: var(--accent-orange);
+    }
+
+    .badge-user {
+      background: var(--bg-tertiary);
+      color: var(--text-muted);
+    }
+
+    .text-muted {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .btn-delete {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      border-radius: 6px;
+      color: var(--accent-red);
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-delete:hover:not(:disabled) {
+      background: var(--accent-red-soft);
+      border-color: var(--accent-red);
+    }
+
+    .btn-delete:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .loading, .empty {
+      text-align: center;
+      padding: var(--space-8);
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    @media (max-width: 768px) {
+      main { padding: var(--space-4); }
+
+      .users-table thead { display: none; }
+
+      .users-table, .users-table tbody, .users-table tr, .users-table td {
+        display: block;
+      }
+
+      .users-table tr {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: var(--space-4);
+        margin-bottom: var(--space-3);
+      }
+
+      .users-table td {
+        border: none !important;
+        border-radius: 0 !important;
+        padding: var(--space-2) 0;
+        background: transparent !important;
+      }
+
+      .users-table td:last-child {
+        margin-top: var(--space-3);
+        padding-top: var(--space-3);
+        border-top: 1px solid var(--border) !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <a href="/" class="back-link">← Volver</a>
+      <div class="logo">GYMAPP<span class="logo-dot"></span></div>
+    </div>
+  </header>
+
+  <main>
+    <h1 class="page-title">USUARIOS</h1>
+
+    <div class="section">
+      <h2 class="section-title">Crear Usuario</h2>
+      <div id="createMessage"></div>
+      <form id="createUserForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="name">Nombre</label>
+            <input type="text" id="name" name="name" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input type="text" id="username" name="username" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" name="password" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="role">Rol</label>
+            <select id="role" name="role">
+              <option value="user">Usuario</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-submit" id="createBtn">Crear</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">Registrados</h2>
+      <div id="usersList">
+        <div class="loading">Cargando...</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const createForm = document.getElementById('createUserForm') as HTMLFormElement
+    const createMessage = document.getElementById('createMessage') as HTMLDivElement
+    const createBtn = document.getElementById('createBtn') as HTMLButtonElement
+    const usersList = document.getElementById('usersList') as HTMLDivElement
+
+    loadUsers()
+
+    function formatDate(dateStr: string) {
+      return new Date(dateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+    }
+
+    function getInitials(name: string) {
+      return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    }
+
+    async function loadUsers() {
+      try {
+        const response = await fetch('/api/admin/users')
+        const data = await response.json()
+
+        if (!response.ok) throw new Error(data.error)
+
+        if (data.users.length === 0) {
+          usersList.innerHTML = '<div class="empty">Sin usuarios</div>'
+          return
+        }
+
+        usersList.innerHTML = `
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Fecha</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.users.map((user: any) => `
+                <tr>
+                  <td>
+                    <div class="user-cell">
+                      <div class="avatar ${user.role === 'admin' ? 'avatar-admin' : 'avatar-user'}">${getInitials(user.name)}</div>
+                      <div class="user-info">
+                        <strong>${user.name}</strong>
+                        <span>@${user.username}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-muted">${user.email}</td>
+                  <td>
+                    <span class="badge ${user.role === 'admin' ? 'badge-admin' : 'badge-user'}">
+                      ${user.role}
+                    </span>
+                  </td>
+                  <td class="text-muted">${formatDate(user.created_at)}</td>
+                  <td>
+                    <button
+                      class="btn-delete"
+                      onclick="deleteUser('${user.id}', '${user.name}')"
+                      ${user.role === 'admin' ? 'disabled' : ''}
+                    >Eliminar</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `
+      } catch (err) {
+        usersList.innerHTML = '<div class="message-error">' + (err instanceof Error ? err.message : 'Error') + '</div>'
+      }
+    }
+
+    createForm.addEventListener('submit', async (e) => {
+      e.preventDefault()
+
+      createBtn.disabled = true
+      createBtn.textContent = 'Creando...'
+      createMessage.innerHTML = ''
+
+      const formData = new FormData(createForm)
+      const userData = {
+        name: formData.get('name'),
+        username: formData.get('username'),
+        email: formData.get('email'),
+        password: formData.get('password'),
+        role: formData.get('role')
+      }
+
+      try {
+        const response = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) throw new Error(data.error)
+
+        createMessage.innerHTML = '<div class="message message-success">Usuario creado</div>'
+        createForm.reset()
+        loadUsers()
+      } catch (err) {
+        createMessage.innerHTML = '<div class="message message-error">' + (err instanceof Error ? err.message : 'Error') + '</div>'
+      } finally {
+        createBtn.disabled = false
+        createBtn.textContent = 'Crear'
+      }
+    })
+
+    async function deleteUser(id: string, name: string) {
+      if (!confirm('Eliminar a ' + name + '?')) return
+
+      try {
+        const response = await fetch('/api/admin/users?id=' + id, { method: 'DELETE' })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error)
+        loadUsers()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Error')
+      }
+    }
+
+    (window as any).deleteUser = deleteUser
+  </script>
+</body>
+</html>
