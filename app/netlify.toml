@@ -9,8 +9,3 @@
   from = "/*"
   to = "/.netlify/functions/ssr"
   status = 200
-
-[functions]
-  directory = ".netlify/functions"
-  node_bundler = "esbuild"
-  external_node_modules = ["bcryptjs", "jose", "@supabase/supabase-js"]
