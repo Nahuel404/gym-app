@@ -61,6 +61,13 @@ No olvides ejecutar los scripts SQL en Supabase:
 1. `db/create-workouts-table.sql` - Crea la estructura de workouts
 2. `db/create-favorites.sql` - Crea la tabla de favoritos
 
+## Seguridad de las variables
+
+Las variables de entorno se manejan de forma segura:
+- `PUBLIC_SUPABASE_URL` y `PUBLIC_SUPABASE_ANON_KEY` están diseñadas para ser públicas y se incluyen en el bundle del cliente
+- `SUPABASE_SERVICE_ROLE_KEY` y `JWT_SECRET` solo se usan en funciones del servidor y NO se exponen al cliente
+- El escaneo de secretos de Netlify está configurado para permitir estas variables solo en las funciones del servidor
+
 ## Verificar el despliegue
 
 Una vez desplegado, verifica:
