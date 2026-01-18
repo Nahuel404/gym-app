@@ -97,53 +97,94 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
     }
 
     main {
-      padding: var(--space-6);
+      padding: var(--space-4);
       max-width: 1200px;
       margin: 0 auto;
     }
 
+    @media (min-width: 768px) {
+      main {
+        padding: var(--space-6);
+      }
+    }
+
     .page-header {
-      margin-bottom: var(--space-6);
+      margin-bottom: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+      .page-header {
+        margin-bottom: var(--space-6);
+      }
     }
 
     .page-header h1 {
       font-family: var(--font-display);
-      font-size: 1.75rem;
-      letter-spacing: 2px;
+      font-size: 1.25rem;
+      letter-spacing: 1.5px;
       margin-bottom: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+      .page-header h1 {
+        font-size: 1.75rem;
+        letter-spacing: 2px;
+      }
     }
 
     .page-header p {
       color: var(--text-muted);
-      font-size: 0.875rem;
+      font-size: 0.8rem;
+    }
+
+    @media (min-width: 768px) {
+      .page-header p {
+        font-size: 0.875rem;
+      }
     }
 
     .content-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-6);
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
     }
 
-    @media (max-width: 900px) {
+    @media (min-width: 900px) {
       .content-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-6);
       }
     }
 
     .section {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: var(--space-5);
+      border-radius: 8px;
+      padding: var(--space-3);
+    }
+
+    @media (min-width: 768px) {
+      .section {
+        border-radius: 12px;
+        padding: var(--space-5);
+      }
     }
 
     .section-title {
       font-family: var(--font-display);
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: var(--space-5);
+      letter-spacing: 1.5px;
+      margin-bottom: var(--space-3);
+    }
+
+    @media (min-width: 768px) {
+      .section-title {
+        font-size: 0.7rem;
+        letter-spacing: 2px;
+        margin-bottom: var(--space-5);
+      }
     }
 
     /* Add Form */
@@ -178,14 +219,16 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
 
     .variants-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-3);
-      margin-top: var(--space-3);
+      grid-template-columns: 1fr;
+      gap: var(--space-2);
+      margin-top: var(--space-2);
     }
 
-    @media (max-width: 600px) {
+    @media (min-width: 600px) {
       .variants-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-3);
+        margin-top: var(--space-3);
       }
     }
 
@@ -226,11 +269,19 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      padding: var(--space-4);
+      padding: var(--space-3);
       background: var(--bg-secondary);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 6px;
       transition: all var(--transition-fast);
+      gap: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+      .favorite-item {
+        padding: var(--space-4);
+        border-radius: 8px;
+      }
     }
 
     .favorite-item:hover {
@@ -239,21 +290,37 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
 
     .favorite-info {
       flex: 1;
+      min-width: 0;
     }
 
     .favorite-name {
       font-family: var(--font-display);
-      font-size: 0.875rem;
-      letter-spacing: 1px;
+      font-size: 0.8rem;
+      letter-spacing: 0.8px;
       margin-bottom: var(--space-1);
+      word-break: break-word;
+    }
+
+    @media (min-width: 768px) {
+      .favorite-name {
+        font-size: 0.875rem;
+        letter-spacing: 1px;
+      }
     }
 
     .favorite-muscle {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       margin-bottom: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+      .favorite-muscle {
+        font-size: 0.7rem;
+        letter-spacing: 1px;
+      }
     }
 
     .favorite-variants {
@@ -306,9 +373,16 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
     }
 
     .star-icon {
-      font-size: 1.25rem;
+      font-size: 1rem;
       color: var(--accent-orange);
-      margin-right: var(--space-2);
+      margin-right: var(--space-1);
+    }
+
+    @media (min-width: 768px) {
+      .star-icon {
+        font-size: 1.25rem;
+        margin-right: var(--space-2);
+      }
     }
 
     .message {
