@@ -1,4 +1,5 @@
 ---
+import '../../../styles/global.css';
 import { supabase } from '../../../lib/supabase';
 
 const user = Astro.locals.user;
@@ -99,7 +100,6 @@ const workoutExercisesData = Array.from(exercisesMap.values());
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Editar Entrenamiento - GymApp</title>
-  <link rel="stylesheet" href="/src/styles/global.css">
   <style is:global>
     .app-header {
       background: var(--bg-secondary);

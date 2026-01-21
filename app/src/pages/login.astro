@@ -1,4 +1,6 @@
 ---
+import '../styles/global.css';
+
 const cookies = Astro.request.headers.get('cookie') || ''
 const hasSession = cookies.includes('session=')
 if (hasSession) {
@@ -12,7 +14,6 @@ if (hasSession) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - GymApp</title>
-  <link rel="stylesheet" href="/src/styles/global.css">
   <style>
     .login-page {
       min-height: 100vh;

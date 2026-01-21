@@ -1,4 +1,5 @@
 ---
+import '../styles/global.css';
 import { supabase } from '../lib/supabase';
 
 const user = Astro.locals.user;
@@ -82,7 +83,6 @@ const workoutDays = workoutsData?.map(workout => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial - GymApp</title>
-  <link rel="stylesheet" href="/src/styles/global.css">
   <style>
     .app-header {
       background: var(--bg-secondary);

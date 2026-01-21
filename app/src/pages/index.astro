@@ -1,4 +1,5 @@
 ---
+import '../styles/global.css';
 import LineChart from '../components/charts/LineChart.astro';
 import BarChart from '../components/charts/BarChart.astro';
 import ProgressRing from '../components/charts/ProgressRing.astro';
@@ -234,7 +235,6 @@ if (favoritesData && favoritesData.length > 0) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - GymApp</title>
-  <link rel="stylesheet" href="/src/styles/global.css">
   <style>
     .app-header {
       background: var(--bg-secondary);
