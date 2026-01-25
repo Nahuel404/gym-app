@@ -195,6 +195,30 @@ const matchesFavorite = (h: any, fav: any) => {
     (h.variant_position || null) === (fav.variant_position || null);
 };
 
+// Obtener parámetros de filtro de URL
+const url = new URL(Astro.request.url);
+const periodType = url.searchParams.get('periodType') || 'last';
+const periodValue = parseInt(url.searchParams.get('periodValue') || '8');
+const dateFrom = url.searchParams.get('dateFrom');
+const dateTo = url.searchParams.get('dateTo');
+
+// Función para filtrar workouts según período
+const filterWorkoutsByPeriod = (workouts: typeof workoutsData) => {
+  if (!workouts) return [];
+
+  if (periodType === 'last') {
+    return workouts.slice(-periodValue);
+  } else if (periodType === 'range' && dateFrom && dateTo) {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    return workouts.filter(w => {
+      const date = new Date(w.workout_date);
+      return date >= from && date <= to;
+    });
+  }
+  return workouts.slice(-8);
+};
+
 // Datos para grafico de progreso (ejercicios favoritos)
 const colors = ['#30d158', '#ff9f0a', '#0a84ff', '#bf5af2', '#ff453a'];
 const progressSeries: Array<{ name: string; data: { label: string; value: number }[]; color: string }> = [];
@@ -203,18 +227,21 @@ if (favoritesData && favoritesData.length > 0) {
   favoritesData.forEach((fav, index) => {
     const favKey = getFavoriteKey(fav);
 
-    // Obtener últimos 8 workouts que contengan este favorito
+    // Obtener workouts que contengan este favorito y filtrar por período
     const workoutsWithFavorite = workoutsData
-      ?.filter(w => w.exercise_history?.some(h => matchesFavorite(h, fav)))
-      .slice(-8) || [];
+      ?.filter(w => w.exercise_history?.some(h => matchesFavorite(h, fav))) || [];
 
-    if (workoutsWithFavorite.length > 0) {
-      const data = workoutsWithFavorite.map((w, i) => {
+    const filteredWorkouts = filterWorkoutsByPeriod(workoutsWithFavorite);
+
+    if (filteredWorkouts.length > 0) {
+      const data = filteredWorkouts.map((w, i) => {
         // Tomar el peso máximo de ese ejercicio+variante en ese workout
         const exerciseSets = w.exercise_history?.filter(h => matchesFavorite(h, fav)) || [];
         const maxWeight = Math.max(...exerciseSets.map(s => s.weight));
+        const workoutDate = new Date(w.workout_date);
+        const label = workoutDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
         return {
-          label: `W${i + 1}`,
+          label,
           value: maxWeight
         };
       });
@@ -752,6 +779,431 @@ if (favoritesData && favoritesData.length > 0) {
       color: var(--text-muted);
       font-size: 0.875rem;
     }
+
+    /* Period Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-overlay.active {
+      display: flex;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: var(--space-6);
+      max-width: 540px;
+      width: 100%;
+      position: relative;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-5);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-primary);
+    }
+
+    .btn-close-modal {
+      padding: 0;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.5rem;
+      line-height: 1;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-close-modal:hover {
+      color: var(--accent-red);
+    }
+
+    .period-tabs {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-5);
+      background: var(--bg-card);
+      padding: var(--space-2);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .period-tab {
+      flex: 1;
+      padding: var(--space-3);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .period-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .period-tab.active {
+      background: var(--text-primary);
+      color: var(--bg-primary);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .quick-periods {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+
+    .quick-period-btn {
+      padding: var(--space-4);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-align: left;
+    }
+
+    .quick-period-btn:hover {
+      border-color: var(--border-light);
+      background: var(--bg-tertiary);
+    }
+
+    .quick-period-btn.selected {
+      border-color: var(--accent-green);
+      background: var(--accent-green-soft);
+    }
+
+    .quick-period-label {
+      font-family: var(--font-display);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-1);
+    }
+
+    .quick-period-value {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+    }
+
+    /* Calendar */
+    .calendar-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: var(--space-4);
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .calendar-container * {
+      box-sizing: border-box;
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-4);
+    }
+
+    .calendar-month {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .calendar-nav {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .calendar-nav-btn {
+      padding: var(--space-1);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition-fast);
+    }
+
+    .calendar-nav-btn:hover {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .calendar-grid-container {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .calendar-day-header {
+      font-family: var(--font-display);
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 0;
+      letter-spacing: 0.5px;
+      font-weight: 400;
+      height: 32px;
+    }
+
+    .calendar-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 0.8rem;
+      font-family: var(--font-body);
+      transition: all 0.15s ease;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      user-select: none;
+      cursor: pointer;
+      position: relative;
+    }
+
+    /* Hover de semana completa - borde gris */
+    .calendar-day.week-hover {
+      background: rgba(160, 160, 160, 0.1);
+      border-top: 2px solid rgba(160, 160, 160, 0.4);
+      border-bottom: 2px solid rgba(160, 160, 160, 0.4);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    .calendar-day.week-hover.week-start {
+      border-left: 2px solid rgba(160, 160, 160, 0.4);
+      border-top-left-radius: 6px;
+      border-bottom-left-radius: 6px;
+    }
+
+    .calendar-day.week-hover.week-end {
+      border-right: 2px solid rgba(160, 160, 160, 0.4);
+      border-top-right-radius: 6px;
+      border-bottom-right-radius: 6px;
+    }
+
+    /* Semana seleccionada - borde verde */
+    .calendar-day.selected-week {
+      background: rgba(48, 209, 88, 0.15);
+      border-top: 2px solid var(--accent-green);
+      border-bottom: 2px solid var(--accent-green);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .calendar-day.selected-week.week-start {
+      border-left: 2px solid var(--accent-green);
+      border-top-left-radius: 6px;
+      border-bottom-left-radius: 6px;
+    }
+
+    .calendar-day.selected-week.week-end {
+      border-right: 2px solid var(--accent-green);
+      border-top-right-radius: 6px;
+      border-bottom-right-radius: 6px;
+    }
+
+    .calendar-day.empty {
+      opacity: 0;
+      pointer-events: none;
+      cursor: default;
+      border: none;
+      background: transparent;
+    }
+
+    .calendar-day.today::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      width: 4px;
+      height: 4px;
+      background: var(--accent-orange);
+      border-radius: 50%;
+    }
+
+    .calendar-day.selected-week.today::after {
+      background: var(--text-primary);
+    }
+
+    .calendar-info {
+      margin-top: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: center;
+      letter-spacing: 0.5px;
+      transition: all 0.2s ease;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-modal {
+      flex: 1;
+      padding: var(--space-3) var(--space-4);
+      border-radius: 6px;
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      border: 1px solid var(--border);
+    }
+
+    .btn-modal-cancel {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .btn-modal-cancel:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .btn-modal-apply {
+      background: var(--accent-green);
+      color: var(--bg-primary);
+      border-color: var(--accent-green);
+    }
+
+    .btn-modal-apply:hover {
+      opacity: 0.9;
+    }
+
+    .btn-period-settings {
+      padding: var(--space-1) var(--space-2);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
+
+    .btn-period-settings:hover {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-3);
+    }
+
+    .chart-title-with-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      width: 100%;
+    }
+
+    .chart-title-text {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -815,14 +1267,30 @@ if (favoritesData && favoritesData.length > 0) {
         <!-- Main Charts -->
         <div class="dashboard-grid">
           {progressSeries.length > 0 ? (
-            <LineChart
-              title="Progreso - Favoritos"
-              series={progressSeries}
-              unit="kg"
-              showArea={true}
-              width={420}
-              height={210}
-            />
+            <div class="section">
+              <div class="chart-header">
+                <div class="chart-title-with-btn">
+                  <span class="chart-title-text">
+                    Progreso - Favoritos
+                    {periodType === 'last'
+                      ? ` (Últimos ${periodValue})`
+                      : periodType === 'range' && dateFrom && dateTo
+                        ? ` (${new Date(dateFrom).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - ${new Date(dateTo).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })})`
+                        : ' (Últimos 8)'}
+                  </span>
+                  <button class="btn-period-settings" id="btnOpenPeriodModal">
+                    <span>⚙</span>
+                  </button>
+                </div>
+              </div>
+              <LineChart
+                series={progressSeries}
+                unit="kg"
+                showArea={true}
+                width={420}
+                height={240}
+              />
+            </div>
           ) : (
             <div class="section">
               <div class="section-title">Progreso</div>
@@ -935,7 +1403,338 @@ if (favoritesData && favoritesData.length > 0) {
     )}
   </main>
 
-  <script>
+  <!-- Modal de Períodos -->
+  <div class="modal-overlay" id="periodModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Período de Análisis</h2>
+        <button class="btn-close-modal" id="btnCloseModal">×</button>
+      </div>
+
+      <div class="period-tabs">
+        <button class="period-tab active" data-tab="quick">Rápido</button>
+        <button class="period-tab" data-tab="custom">Personalizado</button>
+      </div>
+
+      <!-- Tab Rápido -->
+      <div class="tab-content active" id="quickTab">
+        <div class="quick-periods">
+          <button class="quick-period-btn selected" data-value="8">
+            <div class="quick-period-label">Últimos</div>
+            <div class="quick-period-value">8</div>
+          </button>
+          <button class="quick-period-btn" data-value="12">
+            <div class="quick-period-label">Últimos</div>
+            <div class="quick-period-value">12</div>
+          </button>
+          <button class="quick-period-btn" data-value="16">
+            <div class="quick-period-label">Últimos</div>
+            <div class="quick-period-value">16</div>
+          </button>
+          <button class="quick-period-btn" data-value="20">
+            <div class="quick-period-label">Últimos</div>
+            <div class="quick-period-value">20</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Personalizado -->
+      <div class="tab-content" id="customTab">
+        <div class="calendar-container">
+          <div class="calendar-header">
+            <button class="calendar-nav-btn" id="prevMonth">‹</button>
+            <div class="calendar-month" id="currentMonth"></div>
+            <button class="calendar-nav-btn" id="nextMonth">›</button>
+          </div>
+          <div class="calendar-grid-container" id="calendarContainer"></div>
+          <div class="calendar-info" id="calendarInfo">
+            Selecciona una semana completa (de lunes a domingo)
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-modal btn-modal-cancel" id="btnCancelModal">Cancelar</button>
+        <button type="button" class="btn-modal btn-modal-apply" id="btnApplyModal">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{ periodType, periodValue, dateFrom, dateTo }}>
+    // Elementos del DOM
+    const modal = document.getElementById('periodModal');
+    const btnOpen = document.getElementById('btnOpenPeriodModal');
+    const btnClose = document.getElementById('btnCloseModal');
+    const btnCancel = document.getElementById('btnCancelModal');
+    const btnApply = document.getElementById('btnApplyModal');
+    const periodTabs = document.querySelectorAll('.period-tab');
+    const quickTab = document.getElementById('quickTab');
+    const customTab = document.getElementById('customTab');
+    const quickPeriodBtns = document.querySelectorAll('.quick-period-btn');
+    const calendarContainer = document.getElementById('calendarContainer');
+    const currentMonthEl = document.getElementById('currentMonth');
+    const prevMonthBtn = document.getElementById('prevMonth');
+    const nextMonthBtn = document.getElementById('nextMonth');
+    const calendarInfo = document.getElementById('calendarInfo');
+
+    // Estado
+    let activeTab = 'quick';
+    let selectedPeriodType = periodType || 'last';
+    let selectedPeriodValue = periodValue || 8;
+    let selectedDateFrom = dateFrom;
+    let selectedDateTo = dateTo;
+    let currentDate = new Date();
+    let rangeStart = null;
+    let rangeEnd = null;
+
+    // Inicializar valores según URL
+    if (periodType === 'range' && dateFrom && dateTo) {
+      activeTab = 'custom';
+      rangeStart = new Date(dateFrom);
+      rangeEnd = new Date(dateTo);
+    } else {
+      quickPeriodBtns.forEach(btn => {
+        if (parseInt(btn.dataset.value) === selectedPeriodValue) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+    }
+
+    // Abrir/cerrar modal
+    btnOpen?.addEventListener('click', () => {
+      modal.classList.add('active');
+      if (activeTab === 'custom') {
+        renderCalendar();
+      }
+    });
+
+    const closeModal = () => {
+      modal.classList.remove('active');
+    };
+
+    btnClose.addEventListener('click', closeModal);
+    btnCancel.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    // Cambiar tabs
+    periodTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        activeTab = tabName;
+
+        periodTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        if (tabName === 'quick') {
+          quickTab.classList.add('active');
+          customTab.classList.remove('active');
+        } else {
+          quickTab.classList.remove('active');
+          customTab.classList.add('active');
+          renderCalendar();
+        }
+      });
+    });
+
+    // Inicializar tab activo
+    if (activeTab === 'custom') {
+      periodTabs.forEach(t => {
+        if (t.dataset.tab === 'custom') {
+          t.classList.add('active');
+        } else {
+          t.classList.remove('active');
+        }
+      });
+      quickTab.classList.remove('active');
+      customTab.classList.add('active');
+    }
+
+    // Selección rápida
+    quickPeriodBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        quickPeriodBtns.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedPeriodValue = parseInt(btn.dataset.value);
+      });
+    });
+
+    // Helpers de calendario
+    function getMonday(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(d.setDate(diff));
+    }
+
+    function getSunday(monday) {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + 6);
+      return d;
+    }
+
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    function isSameDay(d1, d2) {
+      return d1.getDate() === d2.getDate() &&
+             d1.getMonth() === d2.getMonth() &&
+             d1.getFullYear() === d2.getFullYear();
+    }
+
+    function isInRange(date, start, end) {
+      return date >= start && date <= end;
+    }
+
+    // Renderizar calendario
+    function renderCalendar() {
+      if (!calendarContainer) return;
+
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      // Header
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      currentMonthEl.textContent = `${monthNames[month]} ${year}`;
+
+      calendarContainer.innerHTML = '';
+
+      // Agregar headers de días de la semana
+      const dayHeaders = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+      dayHeaders.forEach(day => {
+        const header = document.createElement('div');
+        header.className = 'calendar-day-header';
+        header.textContent = day;
+        calendarContainer.appendChild(header);
+      });
+
+      // Obtener primer día del mes
+      const firstDay = new Date(year, month, 1);
+      const startDate = new Date(getMonday(firstDay));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Generar 42 días (6 semanas x 7 días)
+      for (let i = 0; i < 42; i++) {
+        const currentDay = new Date(startDate);
+        currentDay.setDate(startDate.getDate() + i);
+
+        const weekStart = getMonday(currentDay);
+        const weekEnd = getSunday(weekStart);
+
+        const dayEl = document.createElement('div');
+        dayEl.className = 'calendar-day';
+        dayEl.dataset.weekStart = formatDate(weekStart);
+
+        // Si el día pertenece al mes actual
+        if (currentDay.getMonth() === month) {
+          dayEl.textContent = currentDay.getDate();
+          dayEl.dataset.date = formatDate(currentDay);
+
+          // Marcar inicio y fin de semana
+          if (isSameDay(currentDay, weekStart)) {
+            dayEl.classList.add('week-start');
+          }
+          if (isSameDay(currentDay, weekEnd)) {
+            dayEl.classList.add('week-end');
+          }
+
+          // Marcar hoy
+          if (isSameDay(currentDay, today)) {
+            dayEl.classList.add('today');
+          }
+
+          // Marcar si está en la semana seleccionada
+          if (rangeStart && rangeEnd && isSameDay(weekStart, rangeStart) && isSameDay(weekEnd, rangeEnd)) {
+            dayEl.classList.add('selected-week');
+          }
+
+          // Click para seleccionar semana
+          dayEl.addEventListener('click', () => selectWeek(weekStart));
+
+          // Hover para resaltar semana
+          dayEl.addEventListener('mouseenter', () => {
+            highlightWeek(weekStart, true);
+          });
+          dayEl.addEventListener('mouseleave', () => {
+            highlightWeek(weekStart, false);
+          });
+        } else {
+          // Día de otro mes
+          dayEl.classList.add('empty');
+        }
+
+        calendarContainer.appendChild(dayEl);
+      }
+    }
+
+    // Resaltar semana en hover
+    function highlightWeek(weekStart, highlight) {
+      const weekStartStr = formatDate(weekStart);
+      document.querySelectorAll('.calendar-day').forEach(day => {
+        if (day.dataset.weekStart === weekStartStr && !day.classList.contains('selected-week')) {
+          if (highlight) {
+            day.classList.add('week-hover');
+          } else {
+            day.classList.remove('week-hover');
+          }
+        }
+      });
+    }
+
+    // Seleccionar semana
+    function selectWeek(weekStart) {
+      rangeStart = new Date(weekStart);
+      rangeEnd = getSunday(rangeStart);
+      renderCalendar();
+
+      const startStr = rangeStart.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+      const endStr = rangeEnd.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+      calendarInfo.textContent = `✓ Semana seleccionada: ${startStr} - ${endStr}`;
+      calendarInfo.style.color = 'var(--accent-green)';
+      calendarInfo.style.fontWeight = '500';
+    }
+
+    // Navegación del calendario
+    prevMonthBtn.addEventListener('click', () => {
+      currentDate.setMonth(currentDate.getMonth() - 1);
+      renderCalendar();
+    });
+
+    nextMonthBtn.addEventListener('click', () => {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      renderCalendar();
+    });
+
+    // Aplicar cambios
+    btnApply.addEventListener('click', () => {
+      const url = new URL(window.location.href);
+
+      if (activeTab === 'quick') {
+        url.searchParams.set('periodType', 'last');
+        url.searchParams.set('periodValue', selectedPeriodValue.toString());
+        url.searchParams.delete('dateFrom');
+        url.searchParams.delete('dateTo');
+      } else {
+        if (!rangeStart || !rangeEnd) {
+          alert('Por favor selecciona una semana en el calendario');
+          return;
+        }
+        url.searchParams.set('periodType', 'range');
+        url.searchParams.set('dateFrom', formatDate(rangeStart));
+        url.searchParams.set('dateTo', formatDate(rangeEnd));
+        url.searchParams.delete('periodValue');
+      }
+
+      window.location.href = url.toString();
+    });
+
+    // Logout
     document.getElementById('logoutBtn')?.addEventListener('click', async () => {
       await fetch('/api/auth/logout', { method: 'POST' })
       window.location.href = '/login'

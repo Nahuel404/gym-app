@@ -118,6 +118,23 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       }
     }
 
+    /* Backdrop para móviles */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 40;
+      backdrop-filter: blur(2px);
+    }
+
+    .sidebar-backdrop.active {
+      display: block;
+    }
+
     @media (max-width: 899px) {
       .exercise-sidebar {
         display: none;
@@ -125,11 +142,17 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       .exercise-sidebar.open {
         display: block;
         position: fixed;
-        top: 60px;
+        top: 0;
         left: 0;
         right: 0;
         bottom: 0;
         z-index: 50;
+      }
+    }
+
+    @media (min-width: 900px) {
+      .sidebar-backdrop {
+        display: none !important;
       }
     }
 
@@ -147,13 +170,46 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       }
     }
 
+    .sidebar-header-mobile {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-4);
+    }
+
     .sidebar-title {
       font-family: var(--font-display);
       font-size: 0.6rem;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 2px;
-      margin-bottom: var(--space-4);
+    }
+
+    .sidebar-close-btn {
+      display: none;
+      width: 36px;
+      height: 36px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition-fast);
+    }
+
+    .sidebar-close-btn:hover {
+      background: var(--bg-tertiary);
+      color: var(--accent-red);
+      border-color: var(--accent-red);
+    }
+
+    @media (max-width: 900px) {
+      .sidebar-close-btn {
+        display: flex;
+      }
     }
 
     .search-box {
@@ -494,20 +550,309 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       position: fixed;
       bottom: var(--space-6);
       right: var(--space-6);
-      padding: var(--space-4);
+      width: 56px;
+      height: 56px;
       background: var(--accent-green);
       color: var(--bg-primary);
       border: none;
       border-radius: 50%;
-      font-size: 1.5rem;
+      font-size: 1.75rem;
+      font-weight: 300;
+      line-height: 1;
       cursor: pointer;
-      z-index: 40;
-      box-shadow: 0 4px 12px rgba(48, 209, 88, 0.3);
+      z-index: 100;
+      box-shadow: 0 4px 16px rgba(48, 209, 88, 0.5);
+      transition: all var(--transition-fast);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mobile-toggle:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 8px rgba(48, 209, 88, 0.4);
     }
 
     @media (max-width: 900px) {
       .mobile-toggle {
-        display: block;
+        display: flex;
+      }
+    }
+
+    @media (min-width: 901px) {
+      .mobile-toggle {
+        display: none !important;
+      }
+    }
+
+    /* ========================================
+       ESTILOS RESPONSIVE PARA MÓVILES
+       ======================================== */
+
+    @media (max-width: 600px) {
+      /* Header compacto */
+      .app-header {
+        padding: var(--space-2) var(--space-3);
+        gap: var(--space-2);
+      }
+
+      .header-left {
+        gap: var(--space-2);
+        flex: 1;
+        min-width: 0;
+      }
+
+      .back-btn {
+        padding: var(--space-1) var(--space-2);
+        font-size: 0.75rem;
+      }
+
+      .page-title {
+        font-size: 0.7rem;
+        letter-spacing: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .header-actions {
+        gap: var(--space-2);
+      }
+
+      /* Ocultar botones secundarios en móvil */
+      .header-actions .back-btn {
+        display: none;
+      }
+
+      .btn-save {
+        padding: var(--space-2) var(--space-3);
+        font-size: 0.65rem;
+      }
+
+      /* Workout area compacta */
+      .workout-area {
+        padding: var(--space-3);
+        padding-bottom: 80px; /* Espacio para el botón flotante */
+      }
+
+      .workout-header {
+        margin-bottom: var(--space-4);
+      }
+
+      .workout-info h1 {
+        font-size: 1rem;
+        letter-spacing: 1px;
+      }
+
+      .date-selector {
+        margin-top: var(--space-1);
+      }
+
+      .date-input {
+        padding: var(--space-2);
+        font-size: 0.8rem;
+      }
+
+      /* Empty state más compacto */
+      .empty-workout {
+        padding: var(--space-6) var(--space-4);
+      }
+
+      .empty-icon {
+        font-size: 2rem;
+        margin-bottom: var(--space-3);
+      }
+
+      .empty-text {
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+
+      /* Cards de ejercicios optimizadas */
+      .workout-exercise {
+        border-radius: 8px;
+        margin-bottom: var(--space-3);
+      }
+
+      .exercise-header {
+        padding: var(--space-3);
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .exercise-title {
+        font-size: 0.8rem;
+      }
+
+      .exercise-muscle {
+        font-size: 0.6rem;
+      }
+
+      .exercise-header-buttons {
+        gap: var(--space-2);
+      }
+
+      .btn-favorite,
+      .btn-remove {
+        padding: var(--space-2);
+        font-size: 0.7rem;
+        min-height: 36px;
+        min-width: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Variantes simplificadas */
+      .variants-section {
+        padding: var(--space-3);
+      }
+
+      .variants-title {
+        font-size: 0.6rem;
+        margin-bottom: var(--space-2);
+      }
+
+      .variants-grid {
+        gap: var(--space-2);
+      }
+
+      .variant-group label {
+        font-size: 0.65rem;
+      }
+
+      .variant-select {
+        padding: var(--space-2);
+        font-size: 0.8rem;
+        min-height: 40px;
+      }
+
+      /* Sets optimizados para touch */
+      .sets-container {
+        padding: var(--space-3);
+      }
+
+      .sets-header {
+        grid-template-columns: 40px 1fr 1fr 36px;
+        gap: var(--space-2);
+        padding: var(--space-2);
+        font-size: 0.6rem;
+      }
+
+      .set-row {
+        grid-template-columns: 40px 1fr 1fr 36px;
+        gap: var(--space-2);
+        padding: var(--space-2);
+      }
+
+      .set-number {
+        font-size: 0.8rem;
+      }
+
+      .set-input {
+        padding: var(--space-2);
+        font-size: 1rem;
+        min-height: 44px;
+        border-radius: 8px;
+      }
+
+      /* Inputs type number - quitar spinners y mejorar touch */
+      .set-input::-webkit-outer-spin-button,
+      .set-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .set-input[type=number] {
+        -moz-appearance: textfield;
+      }
+
+      .btn-delete-set {
+        font-size: 1.25rem;
+        min-width: 36px;
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .btn-add-set {
+        padding: var(--space-3);
+        font-size: 0.8rem;
+        min-height: 44px;
+      }
+
+      /* Sidebar móvil mejorado */
+      .exercise-sidebar.open {
+        padding: var(--space-4);
+        padding-top: env(safe-area-inset-top, var(--space-4));
+      }
+
+      .sidebar-header-mobile {
+        margin-bottom: var(--space-3);
+        padding-bottom: var(--space-3);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sidebar-title {
+        font-size: 0.8rem;
+        color: var(--text-primary);
+      }
+
+      .search-box {
+        padding: var(--space-3);
+        font-size: 1rem;
+        min-height: 48px;
+        margin-bottom: var(--space-3);
+      }
+
+      .muscle-group {
+        margin-bottom: var(--space-3);
+      }
+
+      .muscle-group-title {
+        font-size: 0.65rem;
+        padding: var(--space-2) 0;
+      }
+
+      .exercise-item {
+        padding: var(--space-3) var(--space-4);
+        min-height: 52px;
+        margin-bottom: var(--space-2);
+      }
+
+      .exercise-name {
+        font-size: 0.9rem;
+      }
+
+      /* Botón flotante ajustado */
+      .mobile-toggle {
+        bottom: var(--space-4);
+        right: var(--space-4);
+        width: 60px;
+        height: 60px;
+        font-size: 2rem;
+      }
+    }
+
+    /* Ajustes para pantallas muy pequeñas */
+    @media (max-width: 380px) {
+      .page-title {
+        display: none;
+      }
+
+      .workout-info h1 {
+        font-size: 0.9rem;
+      }
+
+      .sets-header {
+        grid-template-columns: 32px 1fr 1fr 32px;
+      }
+
+      .set-row {
+        grid-template-columns: 32px 1fr 1fr 32px;
+      }
+
+      .set-number {
+        font-size: 0.75rem;
       }
     }
   </style>
@@ -525,9 +870,14 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
     </div>
   </header>
 
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
   <main>
     <aside class="exercise-sidebar" id="sidebar">
-      <div class="sidebar-title">Ejercicios</div>
+      <div class="sidebar-header-mobile">
+        <div class="sidebar-title">Ejercicios</div>
+        <button class="sidebar-close-btn" id="sidebarCloseBtn">×</button>
+      </div>
       <input type="text" class="search-box" placeholder="Buscar ejercicio..." id="searchBox">
 
       {muscleGroups.map((group) => (
@@ -567,7 +917,7 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
     </section>
   </main>
 
-  <button class="mobile-toggle" id="mobileToggle">+</button>
+  <button class="mobile-toggle" id="mobileToggle" title="Agregar ejercicios">+</button>
 
   <script define:vars={{ exercises, equipmentOptions, gripOptions, positionOptions }}>
     // Estado del entrenamiento
@@ -583,6 +933,8 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
     const searchBox = document.getElementById('searchBox');
     const sidebar = document.getElementById('sidebar');
     const mobileToggle = document.getElementById('mobileToggle');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
 
     // Cargar favoritos del usuario
     async function loadFavorites() {
@@ -684,9 +1036,25 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
     });
 
     // Mobile toggle
+    // Función para cerrar sidebar
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      sidebarBackdrop.classList.remove('active');
+      mobileToggle.textContent = '+';
+      mobileToggle.style.fontSize = '1.75rem';
+    }
+
+    // Función para abrir/cerrar sidebar
     mobileToggle.addEventListener('click', () => {
-      sidebar.classList.toggle('open');
+      const isOpen = sidebar.classList.toggle('open');
+      sidebarBackdrop.classList.toggle('active', isOpen);
+      mobileToggle.textContent = isOpen ? '×' : '+';
+      mobileToggle.style.fontSize = isOpen ? '2rem' : '1.75rem';
     });
+
+    // Cerrar sidebar al hacer click en el backdrop
+    sidebarBackdrop.addEventListener('click', closeSidebar);
+    sidebarCloseBtn.addEventListener('click', closeSidebar);
 
     // Agregar ejercicio al workout
     exerciseItems.forEach(item => {
@@ -711,6 +1079,11 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
         renderWorkout();
         updateSaveButton();
 
+        // Cerrar sidebar en móviles después de agregar ejercicio
+        if (window.innerWidth <= 900 && sidebar.classList.contains('open')) {
+          closeSidebar();
+        }
+
         // Cerrar sidebar en mobile
         sidebar.classList.remove('open');
       });
@@ -718,6 +1091,10 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
 
     // Renderizar workout
     function renderWorkout() {
+      // Guardar posición del scroll antes de renderizar
+      const workoutArea = workoutContainer.closest('.workout-area');
+      const scrollPosition = workoutArea ? workoutArea.scrollTop : 0;
+
       // Limpiar completamente el contenedor
       workoutContainer.innerHTML = '';
 
@@ -894,6 +1271,13 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
           }
         });
       });
+
+      // Restaurar posición del scroll
+      if (workoutArea) {
+        requestAnimationFrame(() => {
+          workoutArea.scrollTop = scrollPosition;
+        });
+      }
     }
 
     // Actualizar estado del boton guardar
