@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(timeout /t 5)",
-      "Bash(npm run dev)"
+      "Bash(npm run dev)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix global styles not loading in production\n\nImport global.css in Layout.astro to ensure styles are included in the production build bundle.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm run build:*)",
+      "Bash(git push:*)"
     ]
   }
 }

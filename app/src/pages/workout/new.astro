@@ -718,16 +718,18 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
 
     // Renderizar workout
     function renderWorkout() {
+      // Limpiar completamente el contenedor
+      workoutContainer.innerHTML = '';
+
       if (workoutExercises.length === 0) {
-        emptyState.style.display = 'block';
+        workoutContainer.innerHTML = `
+          <div class="empty-workout">
+            <div class="empty-icon">+</div>
+            <p class="empty-text">Selecciona ejercicios de la barra lateral<br>para registrar tu entrenamiento</p>
+          </div>
+        `;
         return;
       }
-
-      emptyState.style.display = 'none';
-
-      // Limpiar y re-renderizar
-      const existingCards = workoutContainer.querySelectorAll('.workout-exercise');
-      existingCards.forEach(card => card.remove());
 
       workoutExercises.forEach((exercise, exIndex) => {
         // Actualizar estado de favorito
