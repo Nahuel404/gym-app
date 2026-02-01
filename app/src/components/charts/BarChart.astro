@@ -201,12 +201,14 @@ const ticks = Array.from({ length: tickCount + 1 }, (_, i) => Math.round(minValu
   </svg>
 </div>
 
-<script define:vars={{ chartId, unit }}>
+<script define:vars={{ chartId, unit, width, height, padding }}>
   const svg = document.getElementById(chartId);
   const tooltip = document.getElementById(`${chartId}-tip`);
 
   if (svg && tooltip) {
     const bars = svg.querySelectorAll('.bar');
+    const tooltipWidth = 90;
+    const tooltipHeight = 44;
 
     bars.forEach((bar) => {
       bar.addEventListener('mouseenter', (e) => {
@@ -218,10 +220,28 @@ const ticks = Array.from({ length: tickCount + 1 }, (_, i) => Math.round(minValu
         tooltip.querySelector('.tip-value').textContent = value + unit;
 
         const rect = t.getBBox();
-        const x = rect.x + rect.width / 2 - 45;
-        const y = rect.y - 50;
+        // Position tooltip centered above the bar
+        let tipX = rect.x + padding.left + rect.width / 2 - tooltipWidth / 2;
+        let tipY = rect.y + padding.top - tooltipHeight - 6;
 
-        tooltip.setAttribute('transform', `translate(${x}, ${y})`);
+        // Check right edge
+        if (tipX + tooltipWidth > width - 10) {
+          tipX = width - tooltipWidth - 10;
+        }
+        // Check left edge
+        if (tipX < 10) {
+          tipX = 10;
+        }
+        // Check top edge - if too high, show below bar
+        if (tipY < 10) {
+          tipY = rect.y + padding.top + rect.height + 6;
+        }
+        // Check bottom edge
+        if (tipY + tooltipHeight > height - 10) {
+          tipY = height - tooltipHeight - 10;
+        }
+
+        tooltip.setAttribute('transform', `translate(${tipX}, ${tipY})`);
         tooltip.setAttribute('visibility', 'visible');
         t.style.filter = 'brightness(1.2)';
       });

@@ -936,6 +936,15 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
     const sidebarBackdrop = document.getElementById('sidebarBackdrop');
     const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
 
+    // Abrir calendario automáticamente al hacer click en el campo de fecha
+    dateEl?.addEventListener('click', () => {
+      try {
+        dateEl.showPicker();
+      } catch (e) {
+        // Fallback para navegadores que no soportan showPicker
+      }
+    });
+
     // Cargar favoritos del usuario
     async function loadFavorites() {
       try {

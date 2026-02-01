@@ -5,6 +5,7 @@ import BarChart from '../components/charts/BarChart.astro';
 import ProgressRing from '../components/charts/ProgressRing.astro';
 import StatCard from '../components/charts/StatCard.astro';
 import { supabase } from '../lib/supabase';
+import { parseLocalDate, formatShortDate, getMonday } from '../lib/dates';
 
 const user = Astro.locals.user;
 
@@ -63,14 +64,14 @@ const totalVolume = historyData.reduce((acc, h) => acc + (h.weight * h.reps), 0)
 
 // Entrenamientos esta semana
 const thisWeek = workoutsData?.filter(w => {
-  const date = new Date(w.workout_date);
+  const date = parseLocalDate(w.workout_date);
   return date >= oneWeekAgo;
 }).length || 0;
 
 // Calcular racha actual
 let currentStreak = 0;
 const sortedWorkouts = workoutsData
-  ?.map(w => new Date(w.workout_date))
+  ?.map(w => parseLocalDate(w.workout_date))
   .sort((a, b) => b.getTime() - a.getTime()) || [];
 
 if (sortedWorkouts.length > 0) {
@@ -100,30 +101,73 @@ const stats = {
   thisWeek,
 };
 
-// Volumen por grupo muscular (ultimo mes)
+// Mapeo de músculos granulares a grupos grandes
+const muscleToGroup: Record<string, string> = {
+  // Brazos
+  'Bíceps': 'Brazos',
+  'Tríceps': 'Brazos',
+  'Antebrazos': 'Brazos',
+  // Piernas
+  'Cuádriceps': 'Piernas',
+  'Isquiotibiales': 'Piernas',
+  'Glúteos': 'Piernas',
+  'Pantorrillas': 'Piernas',
+  // Espalda
+  'Dorsales': 'Espalda',
+  'Espalda Baja': 'Espalda',
+  'Trapecios': 'Espalda',
+  // Hombros
+  'Deltoides': 'Hombros',
+  // Core
+  'Abdominales': 'Core',
+  // Se mantienen igual
+  'Pecho': 'Pecho',
+  'Hombros': 'Hombros',
+  'Core': 'Core',
+  'Brazos': 'Brazos',
+  'Piernas': 'Piernas',
+  'Espalda': 'Espalda',
+};
+
+// Volumen por grupo muscular GRANDE (ultimo mes) - para el primer gráfico
+const volumeByGroupMap = new Map<string, number>();
+// Volumen por músculo GRANULAR (ultimo mes) - para el segundo gráfico
 const volumeByMuscleMap = new Map<string, number>();
+
 workoutsData?.forEach(workout => {
-  const workoutDate = new Date(workout.workout_date);
+  const workoutDate = parseLocalDate(workout.workout_date);
   if (workoutDate >= oneMonthAgo) {
     workout.exercise_history?.forEach(h => {
       if (h.exercises) {
         const muscle = h.exercises.muscle_group;
         const volume = h.weight * h.reps;
+
+        // Agregar al mapa granular
         volumeByMuscleMap.set(muscle, (volumeByMuscleMap.get(muscle) || 0) + volume);
+
+        // Agregar al mapa de grupos grandes
+        const group = muscleToGroup[muscle] || muscle;
+        volumeByGroupMap.set(group, (volumeByGroupMap.get(group) || 0) + volume);
       }
     });
   }
 });
 
-const volumeByMuscle = Array.from(volumeByMuscleMap.entries())
+// Top 5 GRUPOS GRANDES para el gráfico principal
+const volumeByMuscle = Array.from(volumeByGroupMap.entries())
   .map(([label, value]) => ({ label, value }))
   .sort((a, b) => b.value - a.value)
   .slice(0, 5);
 
+// Todos los MÚSCULOS GRANULARES para el gráfico detallado (máximo 10)
+const volumeByMuscleAll = Array.from(volumeByMuscleMap.entries())
+  .map(([label, value]) => ({ label, value }))
+  .sort((a, b) => b.value - a.value)
+  .slice(0, 10);
+
 // Ultimos entrenamientos
 const recentWorkouts = workoutsData?.slice(0, 4).map(workout => {
-  const date = new Date(workout.workout_date);
-  const dateStr = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  const dateStr = formatShortDate(workout.workout_date);
   const exercises = workout.exercise_history || [];
   const uniqueExercises = new Set(exercises.map(e => e.exercises?.id)).size;
   const volume = exercises.reduce((acc, e) => acc + (e.weight * e.reps), 0);
@@ -148,9 +192,8 @@ const getExerciseKey = (h: any) => {
 };
 
 // Records personales (peso maximo por ejercicio+variante)
-const prByExercise = new Map<string, { weight: number; date: Date; name: string }>();
+const prByExercise = new Map<string, { weight: number; dateStr: string; name: string }>();
 workoutsData?.forEach(workout => {
-  const workoutDate = new Date(workout.workout_date);
   workout.exercise_history?.forEach(h => {
     if (h.exercises) {
       const key = getExerciseKey(h);
@@ -158,7 +201,7 @@ workoutsData?.forEach(workout => {
       if (!current || h.weight > current.weight) {
         prByExercise.set(key, {
           weight: h.weight,
-          date: workoutDate,
+          dateStr: workout.workout_date,
           name: key
         });
       }
@@ -172,7 +215,7 @@ const personalRecords = Array.from(prByExercise.values())
   .map(pr => ({
     exercise: pr.name,
     weight: pr.weight,
-    date: pr.date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+    date: formatShortDate(pr.dateStr)
   }));
 
 // Helper para crear clave de favorito
@@ -198,62 +241,160 @@ const matchesFavorite = (h: any, fav: any) => {
 // Obtener parámetros de filtro de URL
 const url = new URL(Astro.request.url);
 const periodType = url.searchParams.get('periodType') || 'last';
-const periodValue = parseInt(url.searchParams.get('periodValue') || '8');
+const periodValue = parseInt(url.searchParams.get('periodValue') || '4'); // 4 semanas por defecto
 const dateFrom = url.searchParams.get('dateFrom');
 const dateTo = url.searchParams.get('dateTo');
 
-// Función para filtrar workouts según período
+// Función para filtrar workouts según período (por semanas)
 const filterWorkoutsByPeriod = (workouts: typeof workoutsData) => {
   if (!workouts) return [];
 
   if (periodType === 'last') {
-    return workouts.slice(-periodValue);
-  } else if (periodType === 'range' && dateFrom && dateTo) {
-    const from = new Date(dateFrom);
-    const to = new Date(dateTo);
+    // Filtrar por últimas X semanas
+    const weeksAgo = periodValue;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - (weeksAgo * 7));
+    cutoffDate.setHours(0, 0, 0, 0);
+
     return workouts.filter(w => {
-      const date = new Date(w.workout_date);
+      const workoutDate = parseLocalDate(w.workout_date);
+      return workoutDate >= cutoffDate;
+    });
+  } else if (periodType === 'range' && dateFrom && dateTo) {
+    const from = parseLocalDate(dateFrom);
+    const to = parseLocalDate(dateTo);
+    return workouts.filter(w => {
+      const date = parseLocalDate(w.workout_date);
       return date >= from && date <= to;
     });
   }
-  return workouts.slice(-8);
+
+  // Por defecto: últimas 4 semanas
+  const defaultCutoff = new Date();
+  defaultCutoff.setDate(defaultCutoff.getDate() - 28); // 4 semanas
+  defaultCutoff.setHours(0, 0, 0, 0);
+  return workouts.filter(w => {
+    const workoutDate = parseLocalDate(w.workout_date);
+    return workoutDate >= defaultCutoff;
+  });
 };
 
 // Datos para grafico de progreso (ejercicios favoritos)
 const colors = ['#30d158', '#ff9f0a', '#0a84ff', '#bf5af2', '#ff453a'];
 const progressSeries: Array<{ name: string; data: { label: string; value: number }[]; color: string }> = [];
 
-if (favoritesData && favoritesData.length > 0) {
-  favoritesData.forEach((fav, index) => {
+if (favoritesData && favoritesData.length > 0 && workoutsData && workoutsData.length > 0) {
+  // Filtrar todos los workouts según el período seleccionado
+  const allFilteredWorkouts = filterWorkoutsByPeriod(workoutsData);
+
+  if (allFilteredWorkouts.length > 0) {
+    // Crear un mapa de semanas únicas ordenadas cronológicamente
+    const weeksMap = new Map<string, Date>();
+    allFilteredWorkouts.forEach(w => {
+      const monday = getMonday(w.workout_date);
+      const key = monday.toISOString().split('T')[0];
+      if (!weeksMap.has(key)) {
+        weeksMap.set(key, monday);
+      }
+    });
+
+    // Ordenar semanas cronológicamente y asignar índice (S1, S2, S3...)
+    const sortedWeeks = Array.from(weeksMap.entries())
+      .sort((a, b) => a[1].getTime() - b[1].getTime());
+
+    // Crear mapa de weekKey -> índice de semana (S1, S2, etc.)
+    const weekIndexMap = new Map<string, number>();
+    sortedWeeks.forEach(([weekKey], index) => {
+      weekIndexMap.set(weekKey, index + 1);
+    });
+
+    // Para cada favorito, construir datos por semana
+    favoritesData.forEach((fav, index) => {
+      const favKey = getFavoriteKey(fav);
+
+      // Obtener el peso máximo por semana para este favorito
+      const weightByWeek = new Map<string, number>();
+
+      allFilteredWorkouts.forEach(w => {
+        const exerciseSets = w.exercise_history?.filter(h => matchesFavorite(h, fav)) || [];
+        if (exerciseSets.length > 0) {
+          const maxWeight = Math.max(...exerciseSets.map(s => s.weight));
+          const monday = getMonday(w.workout_date);
+          const weekKey = monday.toISOString().split('T')[0];
+
+          // Guardar el mayor peso de esa semana
+          const existing = weightByWeek.get(weekKey) || 0;
+          if (maxWeight > existing) {
+            weightByWeek.set(weekKey, maxWeight);
+          }
+        }
+      });
+
+      // Solo agregar si tiene datos
+      if (weightByWeek.size > 0) {
+        // Construir datos para TODAS las semanas (con null donde no hay datos)
+        const data = sortedWeeks.map(([weekKey]) => {
+          const weekNum = weekIndexMap.get(weekKey)!;
+          const weight = weightByWeek.get(weekKey);
+          return {
+            label: `S${weekNum}`,
+            value: weight ?? null as any, // null si no hay datos esa semana
+          };
+        }).filter(d => d.value !== null); // Solo incluir semanas con datos
+
+        if (data.length > 0) {
+          progressSeries.push({
+            name: favKey,
+            data,
+            color: colors[index % colors.length]
+          });
+        }
+      }
+    });
+  }
+}
+
+// Preparar datos del último entrenamiento por ejercicio favorito
+type ExerciseLastWorkout = {
+  name: string;
+  date: string;
+  formattedDate: string;
+  sets: { weight: number; reps: number }[];
+  maxWeight: number;
+  totalVolume: number;
+};
+
+const exerciseLastWorkouts = new Map<string, ExerciseLastWorkout>();
+
+if (favoritesData && workoutsData) {
+  favoritesData.forEach(fav => {
     const favKey = getFavoriteKey(fav);
 
-    // Obtener workouts que contengan este favorito y filtrar por período
-    const workoutsWithFavorite = workoutsData
-      ?.filter(w => w.exercise_history?.some(h => matchesFavorite(h, fav))) || [];
+    // Buscar el último workout que contenga este ejercicio (workouts ya ordenados desc)
+    for (const workout of workoutsData) {
+      const matchingSets = workout.exercise_history?.filter(h => matchesFavorite(h, fav)) || [];
 
-    const filteredWorkouts = filterWorkoutsByPeriod(workoutsWithFavorite);
+      if (matchingSets.length > 0) {
+        const sets = matchingSets.map(s => ({ weight: s.weight, reps: s.reps }));
+        const maxWeight = Math.max(...sets.map(s => s.weight));
+        const totalVolume = sets.reduce((acc, s) => acc + (s.weight * s.reps), 0);
 
-    if (filteredWorkouts.length > 0) {
-      const data = filteredWorkouts.map((w, i) => {
-        // Tomar el peso máximo de ese ejercicio+variante en ese workout
-        const exerciseSets = w.exercise_history?.filter(h => matchesFavorite(h, fav)) || [];
-        const maxWeight = Math.max(...exerciseSets.map(s => s.weight));
-        const workoutDate = new Date(w.workout_date);
-        const label = workoutDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-        return {
-          label,
-          value: maxWeight
-        };
-      });
-
-      progressSeries.push({
-        name: favKey,
-        data,
-        color: colors[index % colors.length]
-      });
+        exerciseLastWorkouts.set(favKey, {
+          name: favKey,
+          date: workout.workout_date,
+          formattedDate: formatShortDate(workout.workout_date),
+          sets,
+          maxWeight,
+          totalVolume
+        });
+        break; // Solo necesitamos el último
+      }
     }
   });
 }
+
+// Convertir a objeto para pasar al script del cliente
+const exerciseLastWorkoutsData = Object.fromEntries(exerciseLastWorkouts);
 ---
 
 <!DOCTYPE html>
@@ -750,6 +891,17 @@ if (favoritesData && favoritesData.length > 0) {
       }
     }
 
+    /* Full Width Section */
+    .full-width-section {
+      margin-bottom: var(--space-4);
+    }
+
+    @media (min-width: 768px) {
+      .full-width-section {
+        margin-bottom: var(--space-6);
+      }
+    }
+
     /* Bottom Grid */
     .bottom-grid {
       display: grid;
@@ -1204,6 +1356,97 @@ if (favoritesData && favoritesData.length > 0) {
       letter-spacing: 2px;
       flex: 1;
     }
+
+    /* Exercise Modal Styles */
+    .exercise-modal-content {
+      max-width: 400px;
+    }
+
+    .exercise-modal-body {
+      padding: var(--space-2) 0;
+    }
+
+    .exercise-modal-date {
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: var(--space-4);
+      text-align: center;
+    }
+
+    .exercise-stats-row {
+      display: flex;
+      justify-content: space-around;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: var(--space-4);
+    }
+
+    .exercise-stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+    }
+
+    .exercise-stat-value {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+    }
+
+    .exercise-stat-label {
+      font-family: var(--font-body);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .exercise-sets-title {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-3);
+    }
+
+    .exercise-sets-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .exercise-set-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .set-number {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      min-width: 20px;
+    }
+
+    .set-details {
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
@@ -1273,10 +1516,10 @@ if (favoritesData && favoritesData.length > 0) {
                   <span class="chart-title-text">
                     Progreso - Favoritos
                     {periodType === 'last'
-                      ? ` (Últimos ${periodValue})`
+                      ? ` (Últimas ${periodValue} ${periodValue === 1 ? 'semana' : 'semanas'})`
                       : periodType === 'range' && dateFrom && dateTo
-                        ? ` (${new Date(dateFrom).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - ${new Date(dateTo).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })})`
-                        : ' (Últimos 8)'}
+                        ? ` (${formatShortDate(dateFrom)} - ${formatShortDate(dateTo)})`
+                        : ' (Últimas 4 semanas)'}
                   </span>
                   <button class="btn-period-settings" id="btnOpenPeriodModal">
                     <span>⚙</span>
@@ -1327,7 +1570,7 @@ if (favoritesData && favoritesData.length > 0) {
         <div class="dashboard-grid">
           {volumeByMuscle.length > 0 ? (
             <BarChart
-              title="Volumen por Grupo Muscular (mes)"
+              title="Volumen por Grupo (mes)"
               data={volumeByMuscle}
               unit="kg"
               showValues={true}
@@ -1367,6 +1610,20 @@ if (favoritesData && favoritesData.length > 0) {
             )}
           </div>
         </div>
+
+        <!-- Detailed Muscle Volume Chart -->
+        {volumeByMuscleAll.length > 0 && (
+          <div class="full-width-section">
+            <BarChart
+              title="Volumen por Músculo - Detalle (mes)"
+              data={volumeByMuscleAll}
+              unit="kg"
+              showValues={true}
+              width={900}
+              height={280}
+            />
+          </div>
+        )}
 
         <!-- PRs Section -->
         {personalRecords.length > 0 && (
@@ -1419,21 +1676,21 @@ if (favoritesData && favoritesData.length > 0) {
       <!-- Tab Rápido -->
       <div class="tab-content active" id="quickTab">
         <div class="quick-periods">
-          <button class="quick-period-btn selected" data-value="8">
-            <div class="quick-period-label">Últimos</div>
-            <div class="quick-period-value">8</div>
+          <button class="quick-period-btn selected" data-value="4">
+            <div class="quick-period-label">Últimas</div>
+            <div class="quick-period-value">4 sem</div>
+          </button>
+          <button class="quick-period-btn" data-value="8">
+            <div class="quick-period-label">Últimas</div>
+            <div class="quick-period-value">8 sem</div>
           </button>
           <button class="quick-period-btn" data-value="12">
-            <div class="quick-period-label">Últimos</div>
-            <div class="quick-period-value">12</div>
+            <div class="quick-period-label">Últimas</div>
+            <div class="quick-period-value">12 sem</div>
           </button>
           <button class="quick-period-btn" data-value="16">
-            <div class="quick-period-label">Últimos</div>
-            <div class="quick-period-value">16</div>
-          </button>
-          <button class="quick-period-btn" data-value="20">
-            <div class="quick-period-label">Últimos</div>
-            <div class="quick-period-value">20</div>
+            <div class="quick-period-label">Últimas</div>
+            <div class="quick-period-value">16 sem</div>
           </button>
         </div>
       </div>
@@ -1460,7 +1717,39 @@ if (favoritesData && favoritesData.length > 0) {
     </div>
   </div>
 
-  <script define:vars={{ periodType, periodValue, dateFrom, dateTo }}>
+  <!-- Modal de Detalle de Ejercicio -->
+  <div class="modal-overlay" id="exerciseModal">
+    <div class="modal-content exercise-modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="exerciseModalTitle">Ejercicio</h2>
+        <button class="btn-close-modal" id="btnCloseExerciseModal">×</button>
+      </div>
+
+      <div class="exercise-modal-body">
+        <div class="exercise-modal-date" id="exerciseModalDate"></div>
+
+        <div class="exercise-stats-row">
+          <div class="exercise-stat-item">
+            <span class="exercise-stat-value" id="exerciseMaxWeight">-</span>
+            <span class="exercise-stat-label">Peso Máx</span>
+          </div>
+          <div class="exercise-stat-item">
+            <span class="exercise-stat-value" id="exerciseTotalVolume">-</span>
+            <span class="exercise-stat-label">Volumen</span>
+          </div>
+          <div class="exercise-stat-item">
+            <span class="exercise-stat-value" id="exerciseTotalSets">-</span>
+            <span class="exercise-stat-label">Series</span>
+          </div>
+        </div>
+
+        <div class="exercise-sets-title">Series</div>
+        <div class="exercise-sets-list" id="exerciseSetsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script define:vars={{ periodType, periodValue, dateFrom, dateTo, exerciseLastWorkoutsData }}>
     // Elementos del DOM
     const modal = document.getElementById('periodModal');
     const btnOpen = document.getElementById('btnOpenPeriodModal');
@@ -1480,7 +1769,7 @@ if (favoritesData && favoritesData.length > 0) {
     // Estado
     let activeTab = 'quick';
     let selectedPeriodType = periodType || 'last';
-    let selectedPeriodValue = periodValue || 8;
+    let selectedPeriodValue = periodValue || 4; // 4 semanas por defecto
     let selectedDateFrom = dateFrom;
     let selectedDateTo = dateTo;
     let currentDate = new Date();
@@ -1732,6 +2021,64 @@ if (favoritesData && favoritesData.length > 0) {
       }
 
       window.location.href = url.toString();
+    });
+
+    // === Modal de Ejercicio ===
+    const exerciseModal = document.getElementById('exerciseModal');
+    const btnCloseExercise = document.getElementById('btnCloseExerciseModal');
+    const exerciseModalTitle = document.getElementById('exerciseModalTitle');
+    const exerciseModalDate = document.getElementById('exerciseModalDate');
+    const exerciseMaxWeight = document.getElementById('exerciseMaxWeight');
+    const exerciseTotalVolume = document.getElementById('exerciseTotalVolume');
+    const exerciseTotalSets = document.getElementById('exerciseTotalSets');
+    const exerciseSetsList = document.getElementById('exerciseSetsList');
+
+    // Cerrar modal de ejercicio
+    const closeExerciseModal = () => {
+      exerciseModal?.classList.remove('active');
+    };
+
+    btnCloseExercise?.addEventListener('click', closeExerciseModal);
+    exerciseModal?.addEventListener('click', (e) => {
+      if (e.target === exerciseModal) closeExerciseModal();
+    });
+
+    // Abrir modal al hacer clic en un ejercicio de la leyenda
+    document.querySelectorAll('.legend-item-html[data-exercise-name]').forEach(item => {
+      item.addEventListener('click', () => {
+        const exerciseName = item.getAttribute('data-exercise-name');
+        if (!exerciseName) return;
+
+        const exerciseData = exerciseLastWorkoutsData[exerciseName];
+        if (!exerciseData) {
+          alert('No hay datos disponibles para este ejercicio');
+          return;
+        }
+
+        // Poblar modal
+        exerciseModalTitle.textContent = exerciseData.name.length > 30
+          ? exerciseData.name.substring(0, 30) + '...'
+          : exerciseData.name;
+        exerciseModalDate.textContent = `Último: ${exerciseData.formattedDate}`;
+        exerciseMaxWeight.textContent = `${exerciseData.maxWeight}kg`;
+        exerciseTotalVolume.textContent = `${(exerciseData.totalVolume / 1000).toFixed(1)}t`;
+        exerciseTotalSets.textContent = exerciseData.sets.length;
+
+        // Renderizar sets
+        exerciseSetsList.innerHTML = exerciseData.sets.map((set, i) => `
+          <div class="exercise-set-item">
+            <span class="set-number">${i + 1}</span>
+            <span class="set-details">${set.weight}kg × ${set.reps}</span>
+          </div>
+        `).join('');
+
+        exerciseModal?.classList.add('active');
+      });
+
+      // También permitir abrir con Enter
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') item.click();
+      });
     });
 
     // Logout

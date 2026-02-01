@@ -31,7 +31,27 @@ const padding = { top: 30, right: 20, bottom: 50, left: 50 };
 const chartWidth = width - padding.left - padding.right;
 const chartHeight = height - padding.top - padding.bottom;
 
-const allLabels = [...new Set(series.flatMap((s) => s.data.map((d) => d.label)))];
+// Parse label for sorting - handles "S1", "S2" (weeks) or "13 ene" (dates)
+const parseLabelForSort = (label: string): number => {
+  // Week format: "S1", "S2", etc.
+  if (label.startsWith('S') && !isNaN(parseInt(label.slice(1)))) {
+    return parseInt(label.slice(1));
+  }
+
+  // Date format: "13 ene"
+  const months: Record<string, number> = {
+    'ene': 0, 'feb': 1, 'mar': 2, 'abr': 3, 'may': 4, 'jun': 5,
+    'jul': 6, 'ago': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11
+  };
+  const parts = label.toLowerCase().split(' ');
+  const day = parseInt(parts[0]);
+  const month = months[parts[1]] ?? 0;
+  const year = new Date().getFullYear();
+  return new Date(year, month, day).getTime();
+};
+
+const allLabels = [...new Set(series.flatMap((s) => s.data.map((d) => d.label)))]
+  .sort((a, b) => parseLabelForSort(a) - parseLabelForSort(b));
 const allValues = series.flatMap((s) => s.data.map((d) => d.value));
 const maxValue = Math.max(...allValues);
 const minValue = Math.min(0, ...allValues);
@@ -135,7 +155,7 @@ const gradients = series.map((s, i) => ({
   {showLegend && (
     <div class="legend-wrapper">
       {legendData.map((l) => (
-        <div class="legend-item-html" title={l.name}>
+        <div class="legend-item-html" title={l.name} data-exercise-name={l.name} role="button" tabindex="0">
           <span class="legend-dot" style={`background: ${l.color}`}></span>
           <span class="legend-label">{l.shortName}</span>
         </div>
@@ -195,19 +215,34 @@ const gradients = series.map((s, i) => ({
     </g>
 
     <g id={`${chartId}-tip`} class="tooltip" visibility="hidden">
-      <rect x="0" y="0" width="180" height="44" rx="4" />
-      <text x="8" y="16" class="tip-label"></text>
-      <text x="8" y="34" class="tip-value"></text>
+      <rect x="0" y="0" width="160" height="54" rx="4" />
+      <text x="8" y="14" class="tip-label"></text>
+      <text x="8" y="30" class="tip-date"></text>
+      <text x="8" y="46" class="tip-value"></text>
     </g>
   </svg>
 </div>
 
-<script define:vars={{ chartId, unit }}>
+<script define:vars={{ chartId, unit, width, height, padding }}>
   const svg = document.getElementById(chartId);
   const tooltip = document.getElementById(`${chartId}-tip`);
 
   if (svg && tooltip) {
     const points = svg.querySelectorAll('.data-point');
+    const tooltipWidth = 160;
+    const tooltipHeight = 54;
+    const chartLeft = padding.left;
+    const chartRight = width - padding.right;
+    const chartTop = padding.top;
+    const chartBottom = height - padding.bottom;
+
+    // Truncate text to fit tooltip width
+    const truncateText = (text, maxChars = 20) => {
+      if (text.length > maxChars) {
+        return text.substring(0, maxChars - 1) + '…';
+      }
+      return text;
+    };
 
     points.forEach((point) => {
       point.addEventListener('mouseenter', (e) => {
@@ -216,13 +251,38 @@ const gradients = series.map((s, i) => ({
         const value = t.getAttribute('data-value');
         const series = t.getAttribute('data-series');
 
-        tooltip.querySelector('.tip-label').textContent = series || label;
+        tooltip.querySelector('.tip-label').textContent = truncateText(series || 'Ejercicio', 22);
+        tooltip.querySelector('.tip-date').textContent = label;
         tooltip.querySelector('.tip-value').textContent = value + unit;
 
-        const cx = parseFloat(t.getAttribute('cx')) + 60;
-        const cy = parseFloat(t.getAttribute('cy')) + 20;
+        const pointCx = parseFloat(t.getAttribute('cx')) + chartLeft;
+        const pointCy = parseFloat(t.getAttribute('cy')) + chartTop;
 
-        tooltip.setAttribute('transform', `translate(${cx}, ${cy})`);
+        // Default position: to the right and below the point
+        let tipX = pointCx + 10;
+        let tipY = pointCy + 10;
+
+        // Check if tooltip would overflow right edge
+        if (tipX + tooltipWidth > width - 10) {
+          tipX = pointCx - tooltipWidth - 10;
+        }
+
+        // Check if tooltip would overflow bottom edge
+        if (tipY + tooltipHeight > height - 10) {
+          tipY = pointCy - tooltipHeight - 10;
+        }
+
+        // Ensure tooltip doesn't go past left edge
+        if (tipX < 10) {
+          tipX = 10;
+        }
+
+        // Ensure tooltip doesn't go past top edge
+        if (tipY < 10) {
+          tipY = 10;
+        }
+
+        tooltip.setAttribute('transform', `translate(${tipX}, ${tipY})`);
         tooltip.setAttribute('visibility', 'visible');
         t.setAttribute('r', '6');
       });
@@ -318,14 +378,20 @@ const gradients = series.map((s, i) => ({
     background: var(--bg-secondary, #121212);
     border: 1px solid var(--border, #2a2a2a);
     border-radius: 4px;
-    cursor: help;
+    cursor: pointer;
     transition: all 0.15s ease;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
   .legend-item-html:hover {
-    border-color: var(--border-light, #333);
+    border-color: var(--accent-green, #30d158);
+    background: var(--bg-tertiary, #1a1a1a);
+  }
+
+  .legend-item-html:focus {
+    outline: none;
+    border-color: var(--accent-green, #30d158);
   }
 
   .legend-dot {
@@ -353,13 +419,19 @@ const gradients = series.map((s, i) => ({
 
   .tip-label {
     font-family: var(--font-body, 'Space Grotesk', monospace);
-    font-size: 10px;
+    font-size: 9px;
+    fill: var(--text-secondary, #a0a0a0);
+  }
+
+  .tip-date {
+    font-family: var(--font-body, 'Space Grotesk', monospace);
+    font-size: 9px;
     fill: var(--text-muted, #606060);
   }
 
   .tip-value {
     font-family: var(--font-display, 'Orbitron', sans-serif);
-    font-size: 14px;
+    font-size: 13px;
     fill: var(--text-primary, #ffffff);
   }
 </style>

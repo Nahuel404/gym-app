@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { supabase } from '../lib/supabase';
+import { formatFullDate } from '../lib/dates';
 
 const user = Astro.locals.user;
 
@@ -29,7 +30,6 @@ const { data: workoutsData, error } = await supabase
   .order('workout_date', { ascending: false });
 
 const workoutDays = workoutsData?.map(workout => {
-  const date = new Date(workout.workout_date);
   const exercises = workout.exercise_history || [];
   const totalVolume = exercises.reduce((acc, e) => acc + (e.weight * e.reps), 0);
   const uniqueExercises = [...new Set(exercises.map(e => e.exercises?.id))].length;
@@ -48,11 +48,7 @@ const workoutDays = workoutsData?.map(workout => {
   return {
     id: workout.id,
     date: workout.workout_date,
-    formattedDate: date.toLocaleDateString('es-ES', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long'
-    }),
+    formattedDate: formatFullDate(workout.workout_date),
     totalVolume,
     exerciseCount: uniqueExercises,
     setCount: exercises.length,
