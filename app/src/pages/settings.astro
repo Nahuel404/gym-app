@@ -1,0 +1,411 @@
+---
+import '../styles/global.css';
+
+const user = Astro.locals.user;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuración - GymApp</title>
+  <style>
+    .app-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-4) var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .back-btn {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      letter-spacing: 2px;
+    }
+
+    main {
+      padding: var(--space-4);
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    @media (min-width: 768px) {
+      main {
+        padding: var(--space-6);
+      }
+    }
+
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--space-5);
+      margin-bottom: var(--space-5);
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-4);
+    }
+
+    .section-desc {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: var(--space-5);
+    }
+
+    .key-display {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: var(--space-3) var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .key-value {
+      flex: 1;
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      word-break: break-all;
+      user-select: all;
+    }
+
+    .key-placeholder {
+      color: var(--text-muted);
+      font-style: italic;
+      user-select: none;
+    }
+
+    .copy-btn {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      white-space: nowrap;
+    }
+
+    .copy-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .copy-btn.copied {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: var(--space-3) var(--space-4);
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      border: none;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--text-primary);
+      color: var(--text-dark);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .btn-danger {
+      background: var(--accent-red-soft);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(255, 59, 48, 0.2);
+    }
+
+    .status-msg {
+      font-size: 0.8rem;
+      margin-top: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border-radius: 6px;
+      display: none;
+    }
+
+    .status-msg.show {
+      display: block;
+    }
+
+    .status-msg.success {
+      background: var(--accent-green-soft);
+      color: var(--accent-green);
+    }
+
+    .status-msg.error {
+      background: var(--accent-red-soft);
+      color: var(--accent-red);
+    }
+
+    .instructions {
+      margin-top: var(--space-5);
+      padding-top: var(--space-5);
+      border-top: 1px solid var(--border);
+    }
+
+    .instructions-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: var(--space-3);
+    }
+
+    .instructions ol {
+      padding-left: var(--space-5);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+
+    .instructions code {
+      background: var(--bg-secondary);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--accent-orange);
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .user-name {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+    }
+
+    .user-role {
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <a href="/" class="back-btn">&larr; Inicio</a>
+      <h1 class="page-title">CONFIGURACIÓN</h1>
+    </div>
+    <div class="user-info">
+      <span class="user-name">{user.name}</span>
+      <span class="user-role">{user.role}</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- MCP Connection Section -->
+    <div class="section">
+      <h2 class="section-title">Conexión MCP — Claude AI</h2>
+      <p class="section-desc">
+        Generá una API key para conectar tu cuenta con Claude (Desktop o Code).
+        Claude podrá analizar tus entrenamientos, tu progresión y darte recomendaciones personalizadas.
+      </p>
+
+      <div class="key-display">
+        <span class="key-value" id="keyValue">
+          <span class="key-placeholder">Sin API key generada</span>
+        </span>
+        <button class="copy-btn" id="copyBtn" style="display: none;">Copiar</button>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="generateBtn">Generar API Key</button>
+        <button class="btn btn-danger" id="revokeBtn" style="display: none;">Revocar</button>
+      </div>
+
+      <div class="status-msg" id="statusMsg"></div>
+
+      <div class="instructions">
+        <div class="instructions-title">Cómo conectar con Claude</div>
+        <ol>
+          <li>Hacé clic en <strong>Generar API Key</strong> y copiá la key</li>
+          <li>En Claude Desktop, andá a <strong>Settings → MCP Servers</strong></li>
+          <li>Agregá un nuevo server con la URL del MCP y tu API key como <code>Bearer token</code></li>
+          <li>Listo — ya podés pedirle a Claude que analice tus entrenamientos</li>
+        </ol>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const keyValue = document.getElementById('keyValue')!;
+    const copyBtn = document.getElementById('copyBtn') as HTMLButtonElement;
+    const generateBtn = document.getElementById('generateBtn') as HTMLButtonElement;
+    const revokeBtn = document.getElementById('revokeBtn') as HTMLButtonElement;
+    const statusMsg = document.getElementById('statusMsg')!;
+
+    let currentFullKey: string | null = null;
+
+    function showStatus(message: string, type: 'success' | 'error') {
+      statusMsg.textContent = message;
+      statusMsg.className = `status-msg show ${type}`;
+      setTimeout(() => { statusMsg.className = 'status-msg'; }, 4000);
+    }
+
+    function showKey(key: string, isMasked = false) {
+      keyValue.innerHTML = '';
+      keyValue.textContent = key;
+      if (!isMasked) {
+        keyValue.classList.remove('key-placeholder');
+      }
+      copyBtn.style.display = isMasked ? 'none' : 'inline-block';
+      revokeBtn.style.display = 'inline-block';
+      generateBtn.textContent = 'Regenerar API Key';
+    }
+
+    function showMasked(maskedKey: string) {
+      keyValue.innerHTML = '';
+      keyValue.textContent = maskedKey;
+      copyBtn.style.display = 'none';
+      revokeBtn.style.display = 'inline-block';
+      generateBtn.textContent = 'Regenerar API Key';
+    }
+
+    function clearKey() {
+      keyValue.innerHTML = '<span class="key-placeholder">Sin API key generada</span>';
+      copyBtn.style.display = 'none';
+      revokeBtn.style.display = 'none';
+      generateBtn.textContent = 'Generar API Key';
+      currentFullKey = null;
+    }
+
+    // Check existing key on load
+    async function checkKey() {
+      try {
+        const res = await fetch('/api/auth/mcp-key');
+        const data = await res.json();
+        if (data.has_key) {
+          showMasked(data.masked_key);
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Generate / Regenerate
+    generateBtn.addEventListener('click', async () => {
+      generateBtn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/mcp-key', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          currentFullKey = data.api_key;
+          showKey(data.api_key);
+          showStatus('API key generada. Copiala ahora — no se mostrará completa de nuevo.', 'success');
+        } else {
+          showStatus(data.error || 'Error al generar', 'error');
+        }
+      } catch {
+        showStatus('Error de conexión', 'error');
+      }
+      generateBtn.disabled = false;
+    });
+
+    // Copy
+    copyBtn.addEventListener('click', async () => {
+      if (currentFullKey) {
+        await navigator.clipboard.writeText(currentFullKey);
+        copyBtn.textContent = 'Copiado';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.textContent = 'Copiar';
+          copyBtn.classList.remove('copied');
+        }, 2000);
+      }
+    });
+
+    // Revoke
+    revokeBtn.addEventListener('click', async () => {
+      if (!confirm('¿Revocar la API key? Se desconectarán todos los clientes MCP.')) return;
+      revokeBtn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/mcp-key', { method: 'DELETE' });
+        if (res.ok) {
+          clearKey();
+          showStatus('API key revocada', 'success');
+        } else {
+          showStatus('Error al revocar', 'error');
+        }
+      } catch {
+        showStatus('Error de conexión', 'error');
+      }
+      revokeBtn.disabled = false;
+    });
+
+    checkKey();
+  </script>
+</body>
+</html>
