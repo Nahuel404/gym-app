@@ -464,17 +464,112 @@ const exerciseLastWorkoutsData = Object.fromEntries(exerciseLastWorkouts);
       }
     }
 
-    .user-name {
+    .user-menu {
+      position: relative;
+    }
+
+    .user-menu-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: var(--space-1) var(--space-2);
+      cursor: pointer;
+      transition: all var(--transition-fast);
       color: var(--text-secondary);
+      font-family: var(--font-body);
       font-size: 0.75rem;
-      display: none;
     }
 
     @media (min-width: 768px) {
-      .user-name {
-        display: inline;
+      .user-menu-btn {
         font-size: 0.875rem;
       }
+    }
+
+    .user-menu-btn:hover {
+      border-color: var(--border);
+      color: var(--text-primary);
+    }
+
+    .user-menu-btn .chevron {
+      font-size: 0.6rem;
+      transition: transform var(--transition-fast);
+    }
+
+    .user-menu.open .chevron {
+      transform: rotate(180deg);
+    }
+
+    .user-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + var(--space-2));
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-width: 180px;
+      z-index: 200;
+      overflow: hidden;
+    }
+
+    .user-menu.open .user-dropdown {
+      display: block;
+    }
+
+    .dropdown-header {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dropdown-name {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .dropdown-role {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    .dropdown-item {
+      display: block;
+      width: 100%;
+      padding: var(--space-3) var(--space-4);
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      text-align: left;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+
+    .dropdown-item:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .dropdown-item.danger {
+      color: var(--accent-red);
+    }
+
+    .dropdown-item.danger:hover {
+      background: var(--accent-red-soft);
+    }
+
+    .dropdown-divider {
+      height: 1px;
+      background: var(--border);
     }
 
     .header-btn {
@@ -504,17 +599,6 @@ const exerciseLastWorkoutsData = Object.fromEntries(exerciseLastWorkouts);
     .header-btn:hover {
       border-color: var(--text-muted);
       color: var(--text-primary);
-    }
-
-    .btn-logout {
-      background: var(--accent-red-soft);
-      border-color: rgba(255, 59, 48, 0.3);
-      color: var(--accent-red);
-    }
-
-    .btn-logout:hover {
-      background: rgba(255, 59, 48, 0.2);
-      border-color: var(--accent-red);
     }
 
     main {
@@ -1456,13 +1540,26 @@ const exerciseLastWorkoutsData = Object.fromEntries(exerciseLastWorkouts);
       <span class="logo-dot"></span>
     </div>
     <div class="header-actions">
-      <span class="user-name">{user?.name}</span>
       <a href="/favorites" class="header-btn">Favoritos</a>
       <a href="/history" class="header-btn">Historial</a>
       {user?.role === 'admin' && (
         <a href="/admin/users" class="header-btn">Usuarios</a>
       )}
-      <button class="header-btn btn-logout" id="logoutBtn">Salir</button>
+      <div class="user-menu" id="userMenu">
+        <button class="user-menu-btn" id="userMenuBtn">
+          {user?.name}
+          <span class="chevron">▼</span>
+        </button>
+        <div class="user-dropdown">
+          <div class="dropdown-header">
+            <div class="dropdown-name">{user?.name}</div>
+            <div class="dropdown-role">{user?.role}</div>
+          </div>
+          <a href="/settings" class="dropdown-item">Configuración</a>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item danger" id="logoutBtn">Cerrar sesión</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -2079,6 +2176,19 @@ const exerciseLastWorkoutsData = Object.fromEntries(exerciseLastWorkouts);
       item.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') item.click();
       });
+    });
+
+    // User menu dropdown
+    const userMenu = document.getElementById('userMenu')!;
+    const userMenuBtn = document.getElementById('userMenuBtn')!;
+
+    userMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userMenu.classList.toggle('open');
+    });
+
+    document.addEventListener('click', () => {
+      userMenu.classList.remove('open');
     });
 
     // Logout
