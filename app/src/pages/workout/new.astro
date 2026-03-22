@@ -2,6 +2,15 @@
 import '../../styles/global.css';
 import { supabase } from '../../lib/supabase';
 
+interface Exercise {
+  id: string;
+  name: string;
+  muscle_group: string;
+  description: string | null;
+  image_url: string | null;
+  created_at: string;
+}
+
 const user = Astro.locals.user;
 
 // Obtener ejercicios de la base de datos
@@ -12,13 +21,13 @@ const { data: exercises, error } = await supabase
   .order('name', { ascending: true });
 
 // Agrupar ejercicios por grupo muscular
-const exercisesByGroup = exercises?.reduce((acc, ex) => {
+const exercisesByGroup = (exercises as Exercise[] | null)?.reduce((acc, ex) => {
   if (!acc[ex.muscle_group]) {
     acc[ex.muscle_group] = [];
   }
   acc[ex.muscle_group].push(ex);
   return acc;
-}, {} as Record<string, typeof exercises>) || {};
+}, {} as Record<string, Exercise[]>) || {};
 
 const muscleGroups = Object.keys(exercisesByGroup);
 
