@@ -1,6 +1,5 @@
 import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
-import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createClient } from "@supabase/supabase-js";
@@ -51,33 +50,6 @@ async function validateApiKey(
   return user;
 }
 
-// =============================================================================
-// SESSION MANAGEMENT
-// =============================================================================
-
-interface Session {
-  transport: StreamableHTTPServerTransport;
-  server: McpServer;
-  userId: string;
-  createdAt: number;
-}
-
-const sessions = new Map<string, Session>();
-
-// Cleanup sessions older than 4 hours
-setInterval(
-  () => {
-    const maxAge = 4 * 60 * 60 * 1000;
-    const now = Date.now();
-    for (const [id, session] of sessions) {
-      if (now - session.createdAt > maxAge) {
-        session.transport.close?.();
-        sessions.delete(id);
-      }
-    }
-  },
-  30 * 60 * 1000
-);
 
 // =============================================================================
 // HELPERS
@@ -598,7 +570,7 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 // MCP ENDPOINTS
 // =============================================================================
 
-// POST /mcp — mensajes del cliente al server
+// POST /mcp — mensajes del cliente al server (stateless: un server/transport por request)
 app.post("/mcp", async (req: Request, res: Response) => {
   const user = await validateApiKey(req);
   if (!user) {
@@ -610,81 +582,17 @@ app.post("/mcp", async (req: Request, res: Response) => {
     return;
   }
 
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
-  // Existing session
-  if (sessionId && sessions.has(sessionId)) {
-    const session = sessions.get(sessionId)!;
-    await session.transport.handleRequest(req, res, req.body);
-    return;
-  }
-
-  // New session — must be an initialize request
-  const body = req.body;
-  const isInit = Array.isArray(body)
-    ? body.some((m: any) => m?.method === "initialize")
-    : body?.method === "initialize";
-
-  if (!isInit) {
-    res.status(400).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32600,
-        message: "No hay sesión activa. Enviá un request de initialize primero.",
-      },
-      id: body?.id || null,
-    });
-    return;
-  }
-
-  const newSessionId = randomUUID();
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => newSessionId,
+    sessionIdGenerator: undefined,
   });
   const server = createGymServer(user.id);
-
-  transport.onclose = () => {
-    sessions.delete(newSessionId);
-  };
-
   await server.connect(transport);
-
-  sessions.set(newSessionId, {
-    transport,
-    server,
-    userId: user.id,
-    createdAt: Date.now(),
-  });
-
   await transport.handleRequest(req, res, req.body);
-});
-
-// GET /mcp — SSE stream para mensajes del server al cliente
-app.get("/mcp", async (req: Request, res: Response) => {
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-  if (!sessionId || !sessions.has(sessionId)) {
-    res.status(400).json({ error: "Sesión inválida o faltante" });
-    return;
-  }
-
-  const session = sessions.get(sessionId)!;
-  await session.transport.handleRequest(req, res);
-});
-
-// DELETE /mcp — terminar sesión
-app.delete("/mcp", async (req: Request, res: Response) => {
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-  if (sessionId && sessions.has(sessionId)) {
-    const session = sessions.get(sessionId)!;
-    await session.transport.close?.();
-    sessions.delete(sessionId);
-  }
-  res.status(200).json({ message: "Sesión terminada" });
 });
 
 // Health check
 app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", sessions: sessions.size });
+  res.json({ status: "ok" });
 });
 
 // =============================================================================
