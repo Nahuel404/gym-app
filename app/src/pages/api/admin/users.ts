@@ -95,6 +95,80 @@ export const POST: APIRoute = async ({ request }) => {
   }
 }
 
+// PUT - Editar usuario
+export const PUT: APIRoute = async ({ request }) => {
+  const admin = await getAdminUser(request)
+  if (!admin) {
+    return new Response(JSON.stringify({ error: 'No autorizado' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('id')
+
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'ID de usuario requerido' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const body = await request.json()
+    const { email, name, username, role, password } = body
+
+    if (!email || !name || !username || !role) {
+      return new Response(
+        JSON.stringify({ error: 'Nombre, username, email y rol son requeridos' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (role !== 'user' && role !== 'admin') {
+      return new Response(
+        JSON.stringify({ error: 'Rol invalido' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const updates: Record<string, any> = { email, name, username, role }
+
+    if (password && password.trim().length >= 6) {
+      updates.password_hash = await hashPassword(password)
+    }
+
+    const { data: updatedUser, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', userId)
+      .select('id, email, name, username, role, created_at')
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        return new Response(
+          JSON.stringify({ error: 'El email o username ya existe' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      throw error
+    }
+
+    return new Response(JSON.stringify({ user: updatedUser }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (err) {
+    console.error('Error updating user:', err)
+    return new Response(
+      JSON.stringify({ error: 'Error al actualizar usuario' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+}
+
 // DELETE - Eliminar usuario
 export const DELETE: APIRoute = async ({ request }) => {
   const user = await getAdminUser(request)

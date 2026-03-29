@@ -29,31 +29,41 @@ const { data: workoutsData, error } = await supabase
   .eq('user_id', user?.id)
   .order('workout_date', { ascending: false });
 
-const workoutDays = workoutsData?.map(workout => {
-  const exercises = workout.exercise_history || [];
-  const totalVolume = exercises.reduce((acc, e) => acc + (e.weight * e.reps), 0);
-  const uniqueExercises = [...new Set(exercises.map(e => e.exercises?.id))].length;
+// Agrupar workouts por fecha (manejo de múltiples registros del mismo día)
+const workoutsByDate = new Map<string, typeof workoutsData>();
+workoutsData?.forEach(workout => {
+  const date = workout.workout_date;
+  if (!workoutsByDate.has(date)) workoutsByDate.set(date, []);
+  workoutsByDate.get(date)!.push(workout);
+});
 
-  // Agrupar ejercicios por ejercicio + variantes
-  const exercisesGrouped = new Map<string, typeof exercises>();
-  exercises.forEach(e => {
+const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts]) => {
+  // Unir todo el exercise_history de todos los workouts del día
+  const exercises = dayWorkouts.flatMap(w => w.exercise_history || []);
+  const totalVolume = exercises.reduce((acc: number, e: any) => acc + (e.weight * e.reps), 0);
+  const uniqueExercises = [...new Set(exercises.map((e: any) => e.exercises?.id))].length;
+
+  const exercisesGrouped = new Map<string, any[]>();
+  exercises.forEach((e: any) => {
     const exId = e.exercises?.id || 'unknown';
     const variantKey = `${exId}-${e.variant_equipment || ''}-${e.variant_grip || ''}-${e.variant_position || ''}`;
-    if (!exercisesGrouped.has(variantKey)) {
-      exercisesGrouped.set(variantKey, []);
-    }
+    if (!exercisesGrouped.has(variantKey)) exercisesGrouped.set(variantKey, []);
     exercisesGrouped.get(variantKey)!.push(e);
   });
 
+  const primaryId = dayWorkouts[0].id;
+  const allIds = dayWorkouts.map(w => w.id);
+
   return {
-    id: workout.id,
-    date: workout.workout_date,
-    formattedDate: formatFullDate(workout.workout_date),
+    id: primaryId,
+    allIds,
+    date,
+    formattedDate: formatFullDate(date),
     totalVolume,
     exerciseCount: uniqueExercises,
     setCount: exercises.length,
     exercises: Array.from(exercisesGrouped.entries()).map(([key, sets]) => {
-      const variants = [];
+      const variants: string[] = [];
       if (sets[0].variant_equipment) variants.push(sets[0].variant_equipment);
       if (sets[0].variant_grip) variants.push(sets[0].variant_grip);
       if (sets[0].variant_position) variants.push(sets[0].variant_position);
@@ -63,14 +73,11 @@ const workoutDays = workoutsData?.map(workout => {
         name: sets[0].exercises?.name || 'Ejercicio',
         muscle: sets[0].exercises?.muscle_group || '',
         variant: variants.length > 0 ? variants.join(' · ') : '',
-        sets: sets.map(s => ({
-          weight: s.weight,
-          reps: s.reps
-        }))
+        sets: sets.map((s: any) => ({ weight: s.weight, reps: s.reps }))
       };
     })
   };
-}) || [];
+});
 ---
 
 <!DOCTYPE html>
@@ -629,7 +636,7 @@ const workoutDays = workoutsData?.map(workout => {
               </div>
               <div class="day-actions">
                 <button type="button" class="btn-edit" data-id={day.id}>Editar</button>
-                <button type="button" class="btn-delete-workout" data-id={day.id}>Eliminar</button>
+                <button type="button" class="btn-delete-workout" data-id={day.id} data-ids={JSON.stringify(day.allIds)}>Eliminar</button>
                 <div class="day-volume">{(day.totalVolume / 1000).toFixed(1)}t</div>
                 <span class="day-toggle">v</span>
               </div>
@@ -685,39 +692,29 @@ const workoutDays = workoutsData?.map(workout => {
     document.querySelectorAll('.btn-delete-workout').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const workoutId = e.target.dataset.id;
+        const el = e.target as HTMLElement;
+        const ids: string[] = JSON.parse(el.dataset.ids || '[]');
+        if (ids.length === 0) return;
 
         if (!confirm('¿Estás seguro de eliminar este entrenamiento? Esta acción no se puede deshacer.')) {
           return;
         }
 
-        btn.disabled = true;
+        (btn as HTMLButtonElement).disabled = true;
         btn.textContent = 'Eliminando...';
 
         try {
-          const response = await fetch(`/api/workouts?id=${workoutId}`, {
-            method: 'DELETE'
-          });
-
-          if (response.ok) {
-            // Remover del DOM
-            const workoutDay = document.querySelector(`[data-id="${workoutId}"]`);
-            if (workoutDay) {
-              workoutDay.remove();
-            }
-            // Recargar para actualizar estadísticas
-            setTimeout(() => window.location.reload(), 500);
-          } else {
-            const data = await response.json();
-            alert(data.message || 'Error al eliminar el entrenamiento');
-            btn.disabled = false;
-            btn.textContent = 'Eliminar';
-          }
+          await Promise.all(ids.map(id => fetch(`/api/workouts?id=${id}`, { method: 'DELETE' })));
+          const primaryId = el.dataset.id;
+          const workoutDay = document.querySelector(`[data-id="${primaryId}"]`);
+          if (workoutDay) workoutDay.remove();
+          setTimeout(() => window.location.reload(), 500);
         } catch (err) {
           console.error('Error:', err);
           alert('Error al eliminar el entrenamiento');
-          btn.disabled = false;
-          btn.textContent = 'Eliminar';
+          const btnEl = btn as HTMLButtonElement;
+          btnEl.disabled = false;
+          btnEl.textContent = 'Eliminar';
         }
       });
     });

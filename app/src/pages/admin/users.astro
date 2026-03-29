@@ -268,6 +268,31 @@ if (!user || user.role !== 'admin') {
       font-size: 0.8rem;
     }
 
+    .row-actions {
+      display: flex;
+      gap: var(--space-2);
+      justify-content: flex-end;
+    }
+
+    .btn-edit {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-edit:hover {
+      border-color: var(--text-secondary);
+      color: var(--text-primary);
+    }
+
     .btn-delete {
       padding: var(--space-2) var(--space-3);
       background: transparent;
@@ -290,6 +315,68 @@ if (!user || user.role !== 'admin') {
     .btn-delete:disabled {
       opacity: 0.3;
       cursor: not-allowed;
+    }
+
+    /* Edit modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: var(--space-6);
+      width: 100%;
+      max-width: 500px;
+      margin: var(--space-4);
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-5);
+    }
+
+    .modal-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+
+    .btn-cancel {
+      padding: var(--space-3) var(--space-5);
+      background: transparent;
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-cancel:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .hint-text {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
     .loading, .empty {
@@ -387,11 +474,60 @@ if (!user || user.role !== 'admin') {
     </div>
   </main>
 
+  <!-- Edit modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h2 class="modal-title">EDITAR USUARIO</h2>
+      <div id="editMessage"></div>
+      <input type="hidden" id="editUserId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label" for="editName">Nombre</label>
+          <input type="text" id="editName" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editUsername">Username</label>
+          <input type="text" id="editUsername" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editEmail">Email</label>
+          <input type="email" id="editEmail" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editPassword">Nueva Password</label>
+          <input type="password" id="editPassword" placeholder="Dejar vacio para no cambiar" minlength="6">
+          <span class="hint-text">Min. 6 caracteres. Dejar vacio para mantener la actual.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editRole">Rol</label>
+          <select id="editRole">
+            <option value="user">Usuario</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="cancelEdit">Cancelar</button>
+          <button class="btn-submit" id="saveEditBtn">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const createForm = document.getElementById('createUserForm') as HTMLFormElement
     const createMessage = document.getElementById('createMessage') as HTMLDivElement
     const createBtn = document.getElementById('createBtn') as HTMLButtonElement
     const usersList = document.getElementById('usersList') as HTMLDivElement
+
+    const editModal = document.getElementById('editModal') as HTMLDivElement
+    const editUserId = document.getElementById('editUserId') as HTMLInputElement
+    const editName = document.getElementById('editName') as HTMLInputElement
+    const editUsername = document.getElementById('editUsername') as HTMLInputElement
+    const editEmail = document.getElementById('editEmail') as HTMLInputElement
+    const editPassword = document.getElementById('editPassword') as HTMLInputElement
+    const editRole = document.getElementById('editRole') as HTMLSelectElement
+    const editMessage = document.getElementById('editMessage') as HTMLDivElement
+    const saveEditBtn = document.getElementById('saveEditBtn') as HTMLButtonElement
 
     loadUsers()
 
@@ -427,30 +563,36 @@ if (!user || user.role !== 'admin') {
               </tr>
             </thead>
             <tbody>
-              ${data.users.map((user: any) => `
+              ${data.users.map((u: any) => `
                 <tr>
                   <td>
                     <div class="user-cell">
-                      <div class="avatar ${user.role === 'admin' ? 'avatar-admin' : 'avatar-user'}">${getInitials(user.name)}</div>
+                      <div class="avatar ${u.role === 'admin' ? 'avatar-admin' : 'avatar-user'}">${getInitials(u.name)}</div>
                       <div class="user-info">
-                        <strong>${user.name}</strong>
-                        <span>@${user.username}</span>
+                        <strong>${u.name}</strong>
+                        <span>@${u.username}</span>
                       </div>
                     </div>
                   </td>
-                  <td class="text-muted">${user.email}</td>
+                  <td class="text-muted">${u.email}</td>
                   <td>
-                    <span class="badge ${user.role === 'admin' ? 'badge-admin' : 'badge-user'}">
-                      ${user.role}
+                    <span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">
+                      ${u.role}
                     </span>
                   </td>
-                  <td class="text-muted">${formatDate(user.created_at)}</td>
+                  <td class="text-muted">${formatDate(u.created_at)}</td>
                   <td>
-                    <button
-                      class="btn-delete"
-                      onclick="deleteUser('${user.id}', '${user.name}')"
-                      ${user.role === 'admin' ? 'disabled' : ''}
-                    >Eliminar</button>
+                    <div class="row-actions">
+                      <button
+                        class="btn-edit"
+                        onclick="openEditModal('${u.id}', ${JSON.stringify(u.name)}, ${JSON.stringify(u.username)}, ${JSON.stringify(u.email)}, '${u.role}')"
+                      >Editar</button>
+                      <button
+                        class="btn-delete"
+                        onclick="deleteUser('${u.id}', ${JSON.stringify(u.name)})"
+                        ${u.role === 'admin' ? 'disabled' : ''}
+                      >Eliminar</button>
+                    </div>
                   </td>
                 </tr>
               `).join('')}
@@ -461,6 +603,61 @@ if (!user || user.role !== 'admin') {
         usersList.innerHTML = '<div class="message-error">' + (err instanceof Error ? err.message : 'Error') + '</div>'
       }
     }
+
+    function openEditModal(id: string, name: string, username: string, email: string, role: string) {
+      editUserId.value = id
+      editName.value = name
+      editUsername.value = username
+      editEmail.value = email
+      editPassword.value = ''
+      editRole.value = role
+      editMessage.innerHTML = ''
+      editModal.classList.add('open')
+    }
+
+    document.getElementById('cancelEdit')!.addEventListener('click', () => {
+      editModal.classList.remove('open')
+    })
+
+    editModal.addEventListener('click', (e) => {
+      if (e.target === editModal) editModal.classList.remove('open')
+    })
+
+    saveEditBtn.addEventListener('click', async () => {
+      const id = editUserId.value
+      if (!id) return
+
+      saveEditBtn.disabled = true
+      saveEditBtn.textContent = 'Guardando...'
+      editMessage.innerHTML = ''
+
+      try {
+        const body: Record<string, string> = {
+          name: editName.value,
+          username: editUsername.value,
+          email: editEmail.value,
+          role: editRole.value
+        }
+        if (editPassword.value.trim()) body.password = editPassword.value
+
+        const response = await fetch('/api/admin/users?id=' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error)
+
+        editModal.classList.remove('open')
+        loadUsers()
+      } catch (err) {
+        editMessage.innerHTML = '<div class="message message-error">' + (err instanceof Error ? err.message : 'Error') + '</div>'
+      } finally {
+        saveEditBtn.disabled = false
+        saveEditBtn.textContent = 'Guardar'
+      }
+    })
 
     createForm.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -514,6 +711,7 @@ if (!user || user.role !== 'admin') {
     }
 
     (window as any).deleteUser = deleteUser
+    ;(window as any).openEditModal = openEditModal
   </script>
 </body>
 </html>

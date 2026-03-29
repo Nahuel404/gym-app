@@ -43,12 +43,25 @@ async function validateApiKey(
 
   const { data: user, error } = await supabase
     .from("users")
-    .select("id, username, name, is_trainer")
+    .select("id, username, name")
     .eq("mcp_api_key", apiKey)
     .single();
 
   if (error || !user) return null;
-  return user;
+
+  let isTrainer = false;
+  try {
+    const { data: trainerData } = await supabase
+      .from("users")
+      .select("is_trainer")
+      .eq("id", user.id)
+      .single();
+    if (trainerData) isTrainer = trainerData.is_trainer ?? false;
+  } catch {
+    // Column may not exist yet — default to false
+  }
+
+  return { ...user, is_trainer: isTrainer };
 }
 
 

@@ -399,6 +399,25 @@ const workoutExercisesData = Array.from(exercisesMap.values());
       color: var(--accent-orange);
     }
 
+    .btn-change {
+      padding: var(--space-1) var(--space-2);
+      background: transparent;
+      border: 1px solid var(--border-light);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-size: 0.65rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-change:hover {
+      border-color: var(--text-secondary);
+      color: var(--text-primary);
+    }
+
     .btn-remove {
       padding: var(--space-1) var(--space-2);
       background: var(--accent-red-soft);
@@ -413,6 +432,110 @@ const workoutExercisesData = Array.from(exercisesMap.values());
     .btn-remove:hover {
       background: rgba(255, 59, 48, 0.2);
       border-color: var(--accent-red);
+    }
+
+    /* Change exercise modal */
+    .change-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .change-modal-overlay.open {
+      display: flex;
+    }
+
+    .change-modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 420px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      margin: var(--space-4);
+    }
+
+    .change-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .change-modal-title {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+    }
+
+    .change-modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .change-modal-close:hover {
+      color: var(--text-primary);
+    }
+
+    .change-modal-search {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .change-modal-search input {
+      width: 100%;
+      padding: var(--space-2) var(--space-3);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      box-sizing: border-box;
+    }
+
+    .change-modal-search input:focus {
+      outline: none;
+      border-color: var(--accent-green);
+    }
+
+    .change-modal-list {
+      overflow-y: auto;
+      flex: 1;
+      padding: var(--space-2) 0;
+    }
+
+    .change-modal-group-title {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      padding: var(--space-2) var(--space-4);
+    }
+
+    .change-modal-item {
+      padding: var(--space-3) var(--space-4);
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: background var(--transition-fast);
+    }
+
+    .change-modal-item:hover {
+      background: var(--bg-tertiary);
     }
 
     .variants-section {
@@ -614,6 +737,20 @@ const workoutExercisesData = Array.from(exercisesMap.values());
 
   <button class="mobile-toggle" id="mobileToggle">+</button>
 
+  <!-- Change exercise modal -->
+  <div class="change-modal-overlay" id="changeModal">
+    <div class="change-modal">
+      <div class="change-modal-header">
+        <span class="change-modal-title">CAMBIAR EJERCICIO</span>
+        <button class="change-modal-close" id="changeModalClose">&times;</button>
+      </div>
+      <div class="change-modal-search">
+        <input type="text" id="changeSearch" placeholder="Buscar ejercicio...">
+      </div>
+      <div class="change-modal-list" id="changeList"></div>
+    </div>
+  </div>
+
   <script define:vars={{ exercises, equipmentOptions, gripOptions, positionOptions, workoutExercisesData, workoutId: id }}>
     // Estado del entrenamiento
     let workoutExercises = workoutExercisesData || [];
@@ -715,6 +852,63 @@ const workoutExercisesData = Array.from(exercisesMap.values());
     // Cargar favoritos al inicio
     loadFavorites();
 
+    // Change exercise modal
+    let currentChangeIndex = -1;
+    const changeModal = document.getElementById('changeModal');
+    const changeSearch = document.getElementById('changeSearch');
+    const changeList = document.getElementById('changeList');
+
+    function renderChangeList(query) {
+      const q = (query || '').toLowerCase();
+      const byGroup = {};
+      for (const ex of exercises) {
+        if (q && !ex.name.toLowerCase().includes(q) && !ex.muscle_group.toLowerCase().includes(q)) continue;
+        if (!byGroup[ex.muscle_group]) byGroup[ex.muscle_group] = [];
+        byGroup[ex.muscle_group].push(ex);
+      }
+      let html = '';
+      for (const [group, exList] of Object.entries(byGroup)) {
+        html += `<div class="change-modal-group-title">${group}</div>`;
+        for (const ex of exList) {
+          html += `<div class="change-modal-item" data-id="${ex.id}" data-name="${ex.name}" data-muscle="${ex.muscle_group}">${ex.name}</div>`;
+        }
+      }
+      changeList.innerHTML = html || '<div style="padding:1rem;color:var(--text-muted);font-size:0.8rem">Sin resultados</div>';
+      changeList.querySelectorAll('.change-modal-item').forEach(item => {
+        item.addEventListener('click', () => {
+          if (currentChangeIndex < 0) return;
+          workoutExercises[currentChangeIndex].id = item.dataset.id;
+          workoutExercises[currentChangeIndex].name = item.dataset.name;
+          workoutExercises[currentChangeIndex].muscle = item.dataset.muscle;
+          workoutExercises[currentChangeIndex].equipment = '';
+          workoutExercises[currentChangeIndex].grip = '';
+          workoutExercises[currentChangeIndex].position = '';
+          changeModal.classList.remove('open');
+          renderWorkout();
+        });
+      });
+    }
+
+    function openChangeExercise(index) {
+      currentChangeIndex = index;
+      changeSearch.value = '';
+      renderChangeList('');
+      changeModal.classList.add('open');
+      changeSearch.focus();
+    }
+
+    document.getElementById('changeModalClose').addEventListener('click', () => {
+      changeModal.classList.remove('open');
+    });
+
+    changeModal.addEventListener('click', (e) => {
+      if (e.target === changeModal) changeModal.classList.remove('open');
+    });
+
+    changeSearch.addEventListener('input', (e) => {
+      renderChangeList(e.target.value);
+    });
+
     // Busqueda de ejercicios
     searchBox.addEventListener('input', (e) => {
       const query = e.target.value.toLowerCase();
@@ -788,6 +982,7 @@ const workoutExercisesData = Array.from(exercisesMap.values());
               <button type="button" class="btn-favorite ${exercise.isFavorite ? 'favorited' : ''}" data-index="${exIndex}">
                 ${exercise.isFavorite ? '★' : '☆'}
               </button>
+              <button type="button" class="btn-change" data-index="${exIndex}">Cambiar</button>
               <button type="button" class="btn-remove" data-index="${exIndex}">Quitar</button>
             </div>
           </div>
@@ -905,6 +1100,15 @@ const workoutExercisesData = Array.from(exercisesMap.values());
           const exIndex = parseInt(e.target.dataset.index);
           workoutExercises.splice(exIndex, 1);
           renderWorkout();
+        });
+      });
+
+      // Event listeners para cambiar ejercicio
+      document.querySelectorAll('.btn-change').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const exIndex = parseInt(e.target.dataset.index);
+          openChangeExercise(exIndex);
         });
       });
 

@@ -102,21 +102,26 @@ const pendingTrainerCount = user.is_trainer
     }
 
     .header-btn {
-      padding: var(--space-2) var(--space-3);
-      background: transparent;
-      border: 1px solid var(--border);
+      padding: var(--space-1) var(--space-2);
       border-radius: 6px;
-      color: var(--text-secondary);
-      font-size: 0.75rem;
-      cursor: pointer;
-      transition: all var(--transition-fast);
+      font-size: 0.65rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       text-decoration: none;
+      transition: all var(--transition-fast);
+      border: 1px solid var(--border-light);
+      background: transparent;
+      color: var(--text-secondary);
       white-space: nowrap;
+      cursor: pointer;
     }
 
     @media (min-width: 768px) {
       .header-btn {
-        font-size: 0.8rem;
+        padding: var(--space-2) var(--space-4);
+        font-size: 0.75rem;
+        letter-spacing: 1px;
       }
     }
 
@@ -372,7 +377,7 @@ const pendingTrainerCount = user.is_trainer
     .btn-sm {
       padding: var(--space-2) var(--space-3);
       border-radius: 6px;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-family: var(--font-body);
       cursor: pointer;
       transition: all var(--transition-fast);
@@ -387,6 +392,32 @@ const pendingTrainerCount = user.is_trainer
 
     .btn-primary:hover {
       opacity: 0.9;
+    }
+
+    .btn-cta {
+      background: var(--accent-green-soft);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+      font-weight: 600;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: var(--space-2) var(--space-4);
+    }
+
+    .btn-cta:hover {
+      background: rgba(48, 209, 88, 0.2);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-light);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
     }
 
     .btn-danger-outline {
@@ -490,17 +521,6 @@ const pendingTrainerCount = user.is_trainer
       display: flex;
       gap: var(--space-3);
       justify-content: flex-end;
-    }
-
-    .btn-secondary {
-      background: transparent;
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      border-color: var(--text-muted);
-      color: var(--text-primary);
     }
 
     .loading-text {
@@ -682,7 +702,7 @@ const pendingTrainerCount = user.is_trainer
         } else if (t.status === 'pending') {
           actionHtml = '<button class="btn-sm btn-disabled" disabled>Solicitud pendiente...</button>';
         } else {
-          actionHtml = `<button class="btn-sm btn-primary send-request-btn" data-id="${t.id}" data-name="${t.name}">Enviar solicitud</button>`;
+          actionHtml = `<button class="btn-sm btn-cta send-request-btn" data-id="${t.id}" data-name="${t.name}">Enviar solicitud</button>`;
         }
         return `
           <div class="card">

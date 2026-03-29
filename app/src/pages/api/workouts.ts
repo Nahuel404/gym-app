@@ -21,23 +21,37 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // 1. Crear el workout
-    const { data: workout, error: workoutError } = await supabase
+    const targetDate = workout_date || new Date().toISOString().split('T')[0];
+
+    // 1. Buscar si ya existe un workout para este día
+    const { data: existingWorkout } = await supabase
       .from('workouts')
-      .insert({
-        user_id: user.id,
-        workout_date: workout_date || new Date().toISOString().split('T')[0],
-        notes: null
-      })
-      .select()
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('workout_date', targetDate)
       .single();
 
-    if (workoutError) {
-      console.error('Error creando workout:', workoutError);
-      return new Response(JSON.stringify({ message: 'Error al crear el entrenamiento', error: workoutError.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    let workout: { id: string };
+
+    if (existingWorkout) {
+      // Reusar el workout del mismo día
+      workout = existingWorkout;
+    } else {
+      // Crear uno nuevo
+      const { data: newWorkout, error: workoutError } = await supabase
+        .from('workouts')
+        .insert({ user_id: user.id, workout_date: targetDate, notes: null })
+        .select()
+        .single();
+
+      if (workoutError || !newWorkout) {
+        console.error('Error creando workout:', workoutError);
+        return new Response(JSON.stringify({ message: 'Error al crear el entrenamiento', error: workoutError?.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      workout = newWorkout;
     }
 
     // 2. Crear las series asociadas al workout

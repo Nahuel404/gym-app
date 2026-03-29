@@ -140,21 +140,26 @@ function lastWorkoutAgo(dateStr: string | null): string {
     }
 
     .header-btn {
-      padding: var(--space-2) var(--space-3);
-      background: transparent;
-      border: 1px solid var(--border);
+      padding: var(--space-1) var(--space-2);
       border-radius: 6px;
-      color: var(--text-secondary);
-      font-size: 0.75rem;
-      cursor: pointer;
-      transition: all var(--transition-fast);
+      font-size: 0.65rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       text-decoration: none;
+      transition: all var(--transition-fast);
+      border: 1px solid var(--border-light);
+      background: transparent;
+      color: var(--text-secondary);
       white-space: nowrap;
+      cursor: pointer;
     }
 
     @media (min-width: 768px) {
       .header-btn {
-        font-size: 0.8rem;
+        padding: var(--space-2) var(--space-4);
+        font-size: 0.75rem;
+        letter-spacing: 1px;
       }
     }
 
@@ -434,34 +439,67 @@ function lastWorkoutAgo(dateStr: string | null): string {
     }
 
     .workout-date {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 600;
       color: var(--text-primary);
+      text-transform: capitalize;
       margin-bottom: var(--space-2);
     }
 
-    .workout-exercise {
-      margin-left: var(--space-3);
-      margin-bottom: var(--space-2);
+    .workout-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
     }
 
-    .exercise-name {
-      font-size: 0.8rem;
+    .workout-table th {
+      text-align: left;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      padding: var(--space-1) var(--space-2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .workout-table td {
+      padding: var(--space-1) var(--space-2);
+      vertical-align: top;
+      border-bottom: 1px solid var(--bg-secondary);
+    }
+
+    .workout-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .workout-table .td-exercise {
       color: var(--text-secondary);
       font-weight: 500;
+      white-space: nowrap;
     }
 
-    .exercise-sets {
-      font-size: 0.75rem;
+    .workout-table .td-sets {
       color: var(--text-muted);
-      margin-top: 2px;
     }
 
-    .workout-volume {
-      font-size: 0.75rem;
+    .workout-table .td-vol {
+      color: var(--accent-green);
+      font-family: var(--font-display);
+      font-size: 0.65rem;
+      white-space: nowrap;
+      text-align: right;
+    }
+
+    .workout-total {
+      font-size: 0.65rem;
       color: var(--text-muted);
-      margin-top: var(--space-2);
-      margin-left: var(--space-3);
+      text-align: right;
+      margin-top: var(--space-1);
+    }
+
+    .workout-total span {
+      color: var(--accent-green);
+      font-family: var(--font-display);
     }
 
     .view-full-link {
@@ -684,31 +722,37 @@ function lastWorkoutAgo(dateStr: string | null): string {
               for (const h of w.exercise_history || []) {
                 const ex = h.exercises;
                 const parts = [h.variant_equipment, h.variant_grip, h.variant_position].filter(Boolean);
-                const variant = parts.length > 0 ? ` (${parts.join(', ')})` : '';
-                const key = `${ex.name}${variant}`;
+                const variant = parts.length > 0 ? ` · ${parts.join(' · ')}` : '';
+                const key = `${ex.id}${variant}`;
                 if (!exMap.has(key)) exMap.set(key, []);
-                exMap.get(key)!.push(h);
+                exMap.get(key)!.push({ ...h, displayName: `${ex.name}${variant}` });
               }
 
-              let exercisesHtml = '';
+              let rows = '';
               let dayVolume = 0;
-              for (const [name, sets] of exMap) {
-                const setsStr = sets.map((s: any) => `${s.weight}kg x ${s.reps}`).join('  ·  ');
+              for (const [, sets] of exMap) {
+                const setsStr = sets.map((s: any) => `${s.weight}×${s.reps}`).join(' · ');
                 const vol = sets.reduce((a: number, s: any) => a + s.weight * s.reps, 0);
                 dayVolume += vol;
-                exercisesHtml += `
-                  <div class="workout-exercise">
-                    <div class="exercise-name">${name}</div>
-                    <div class="exercise-sets">${setsStr}</div>
-                  </div>
-                `;
+                rows += `<tr>
+                  <td class="td-exercise">${sets[0].displayName}</td>
+                  <td class="td-sets">${setsStr}</td>
+                  <td class="td-vol">${(vol / 1000).toFixed(2)}t</td>
+                </tr>`;
               }
 
               html += `
                 <div class="workout-day">
                   <div class="workout-date">${date}</div>
-                  ${exercisesHtml}
-                  <div class="workout-volume">Volumen: ${(dayVolume / 1000).toFixed(1)}t</div>
+                  <table class="workout-table">
+                    <thead><tr>
+                      <th>Ejercicio</th>
+                      <th>Series</th>
+                      <th style="text-align:right">Vol</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                  </table>
+                  <div class="workout-total">Total: <span>${(dayVolume / 1000).toFixed(1)}t</span></div>
                 </div>
               `;
             }
