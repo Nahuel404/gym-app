@@ -1,0 +1,785 @@
+---
+import '../styles/global.css';
+import { supabase } from '../lib/supabase';
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// Mis entrenadores actuales
+const { data: myTrainersData } = await supabase
+  .from('trainer_students')
+  .select('id, started_at, trainer:users!trainer_students_trainer_id_fkey(id, name, username, avatar_url)')
+  .eq('student_id', user.id)
+  .order('started_at', { ascending: false });
+
+// Solicitudes pendientes enviadas
+const { data: pendingRequestsData } = await supabase
+  .from('trainer_requests')
+  .select('id, message, created_at, trainer:users!trainer_requests_trainer_id_fkey(id, name, username)')
+  .eq('student_id', user.id)
+  .eq('status', 'pending')
+  .order('created_at', { ascending: false });
+
+const myTrainers = myTrainersData || [];
+const pendingRequests = pendingRequestsData || [];
+
+function getTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return 'hace unos minutos';
+  if (hours < 24) return `hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'hace 1 dia';
+  return `hace ${days} dias`;
+}
+
+// Pending request count para badge del header
+const pendingTrainerCount = user.is_trainer
+  ? (await supabase
+      .from('trainer_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('trainer_id', user.id)
+      .eq('status', 'pending')).count || 0
+  : 0;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrenadores - GymApp</title>
+  <style>
+    .app-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: var(--space-3) var(--space-4);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    @media (min-width: 768px) {
+      .app-header {
+        padding: var(--space-4) var(--space-6);
+      }
+    }
+
+    .logo {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .logo-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    @media (min-width: 768px) {
+      .header-actions {
+        gap: var(--space-3);
+      }
+    }
+
+    .header-btn {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    @media (min-width: 768px) {
+      .header-btn {
+        font-size: 0.8rem;
+      }
+    }
+
+    .header-btn:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .header-btn.active {
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+
+    .user-menu {
+      position: relative;
+    }
+
+    .user-menu-btn {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .user-menu-btn:hover {
+      border-color: var(--text-muted);
+    }
+
+    .user-menu-btn .chevron {
+      font-size: 0.6rem;
+      transition: transform var(--transition-fast);
+    }
+
+    .user-menu.open .chevron {
+      transform: rotate(180deg);
+    }
+
+    .user-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-width: 180px;
+      z-index: 200;
+      overflow: hidden;
+    }
+
+    .user-menu.open .user-dropdown {
+      display: block;
+    }
+
+    .dropdown-header {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dropdown-name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .dropdown-role {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .dropdown-item {
+      display: block;
+      width: 100%;
+      padding: var(--space-3) var(--space-4);
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      text-align: left;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background var(--transition-fast);
+    }
+
+    .dropdown-item:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .dropdown-item.danger {
+      color: var(--accent-red);
+    }
+
+    .dropdown-divider {
+      border-top: 1px solid var(--border);
+    }
+
+    .badge {
+      background: var(--accent-orange);
+      color: var(--text-dark);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.1rem 0.4rem;
+      border-radius: 10px;
+      margin-left: var(--space-1);
+    }
+
+    main {
+      padding: var(--space-4);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    @media (min-width: 768px) {
+      main {
+        padding: var(--space-6);
+      }
+    }
+
+    .page-header {
+      margin-bottom: var(--space-6);
+    }
+
+    .page-header h1 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      letter-spacing: 2px;
+      margin-bottom: var(--space-2);
+    }
+
+    .page-header p {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .search-box {
+      position: relative;
+      margin-bottom: var(--space-6);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: var(--space-3) var(--space-4);
+      padding-left: 2.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      font-family: var(--font-body);
+      box-sizing: border-box;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--text-secondary);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: var(--space-3);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .section-label {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .section-block {
+      margin-bottom: var(--space-6);
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: var(--space-4);
+      transition: border-color var(--transition-fast);
+    }
+
+    .card + .card {
+      margin-top: var(--space-3);
+    }
+
+    .card:hover {
+      border-color: var(--border-light);
+    }
+
+    .card-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .card-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-name {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .card-username {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .card-meta {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: var(--space-1);
+    }
+
+    .card-message {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-style: italic;
+      margin-top: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      background: var(--bg-secondary);
+      border-radius: 6px;
+    }
+
+    .btn-sm {
+      padding: var(--space-2) var(--space-3);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      white-space: nowrap;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--text-primary);
+      color: var(--text-dark);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-danger-outline {
+      background: transparent;
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .btn-danger-outline:hover {
+      background: var(--accent-red-soft);
+    }
+
+    .btn-disabled {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      cursor: default;
+    }
+
+    .status-active {
+      color: var(--accent-green);
+      font-size: 0.75rem;
+    }
+
+    .search-results {
+      display: none;
+    }
+
+    .search-results.show {
+      display: block;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: var(--space-8) var(--space-4);
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 2rem;
+      margin-bottom: var(--space-3);
+      opacity: 0.5;
+    }
+
+    .empty-state-text {
+      font-size: 0.875rem;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--space-5);
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .modal h3 {
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-4);
+    }
+
+    .modal textarea {
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      resize: vertical;
+      min-height: 80px;
+      box-sizing: border-box;
+      margin-bottom: var(--space-4);
+    }
+
+    .modal textarea:focus {
+      outline: none;
+      border-color: var(--text-secondary);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: var(--space-3);
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .loading-text {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      padding: var(--space-4);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <a href="/" class="logo">
+      GYMAPP
+      <span class="logo-dot"></span>
+    </a>
+    <div class="header-actions">
+      <a href="/favorites" class="header-btn">Favoritos</a>
+      <a href="/history" class="header-btn">Historial</a>
+      <a href="/trainers" class="header-btn active">Entrenadores</a>
+      {user?.role === 'admin' && (
+        <a href="/admin/users" class="header-btn">Usuarios</a>
+      )}
+      <div class="user-menu" id="userMenu">
+        <button class="user-menu-btn" id="userMenuBtn">
+          {user?.name}
+          <span class="chevron">&#9660;</span>
+        </button>
+        <div class="user-dropdown">
+          <div class="dropdown-header">
+            <div class="dropdown-name">{user?.name}</div>
+            <div class="dropdown-role">{user?.role}</div>
+          </div>
+          <a href="/settings" class="dropdown-item">Configuracion</a>
+          {user?.is_trainer && (
+            <a href="/my-students" class="dropdown-item">
+              Mis Alumnos
+              {pendingTrainerCount > 0 && <span class="badge">{pendingTrainerCount}</span>}
+            </a>
+          )}
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item danger" id="logoutBtn">Cerrar sesion</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-header">
+      <h1>ENTRENADORES</h1>
+      <p>Busca un entrenador y envia una solicitud para entrenar con el</p>
+    </div>
+
+    <div class="search-box">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar entrenador por nombre o usuario..." autocomplete="off">
+    </div>
+
+    <!-- Resultados de búsqueda -->
+    <div class="section-block search-results" id="searchResults">
+      <div class="section-label">Resultados</div>
+      <div id="searchList"></div>
+    </div>
+
+    <!-- Mis entrenadores -->
+    <div class="section-block" id="myTrainersSection">
+      <div class="section-label">Mis Entrenadores</div>
+      {myTrainers.length > 0 ? (
+        myTrainers.map(rel => {
+          const t = rel.trainer as any;
+          const started = new Date(rel.started_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+          return (
+            <div class="card" data-relation-id={rel.id}>
+              <div class="card-row">
+                <div class="card-info">
+                  <div class="card-name">{t.name}</div>
+                  <div class="card-username">@{t.username}</div>
+                  <div class="card-meta">Desde: {started}</div>
+                </div>
+                <button class="btn-sm btn-danger-outline leave-trainer-btn" data-id={rel.id} data-name={t.name}>
+                  Dejar entrenador
+                </button>
+              </div>
+            </div>
+          );
+        })
+      ) : (
+        <div class="empty-state">
+          <div class="empty-state-text">No tienes entrenadores aun. Busca uno arriba.</div>
+        </div>
+      )}
+    </div>
+
+    <!-- Solicitudes pendientes -->
+    {pendingRequests.length > 0 && (
+      <div class="section-block" id="pendingSection">
+        <div class="section-label">Solicitudes Pendientes</div>
+        {pendingRequests.map(req => {
+          const t = req.trainer as any;
+          const ago = getTimeAgo(req.created_at);
+          return (
+            <div class="card" data-request-id={req.id}>
+              <div class="card-row">
+                <div class="card-info">
+                  <div class="card-name">{t.name} <span class="card-username">@{t.username}</span></div>
+                  <div class="card-meta">Enviada {ago}</div>
+                </div>
+                <button class="btn-sm btn-danger-outline cancel-request-btn" data-id={req.id}>
+                  Cancelar
+                </button>
+              </div>
+              {req.message && <div class="card-message">"{req.message}"</div>}
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </main>
+
+  <!-- Modal de solicitud -->
+  <div class="modal-backdrop" id="requestModal">
+    <div class="modal">
+      <h3>ENVIAR SOLICITUD</h3>
+      <textarea id="requestMessage" placeholder="Mensaje opcional para el entrenador..."></textarea>
+      <div class="modal-actions">
+        <button class="btn-sm btn-secondary" id="cancelModal">Cancelar</button>
+        <button class="btn-sm btn-primary" id="confirmRequest">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // User menu
+    const userMenu = document.getElementById('userMenu')!;
+    const userMenuBtn = document.getElementById('userMenuBtn')!;
+    userMenuBtn.addEventListener('click', () => userMenu.classList.toggle('open'));
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target as Node)) userMenu.classList.remove('open');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    });
+
+    // Search
+    const searchInput = document.getElementById('searchInput') as HTMLInputElement;
+    const searchResults = document.getElementById('searchResults')!;
+    const searchList = document.getElementById('searchList')!;
+    let searchTimeout: ReturnType<typeof setTimeout>;
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      const q = searchInput.value.trim();
+      if (q.length < 2) {
+        searchResults.classList.remove('show');
+        return;
+      }
+      searchTimeout = setTimeout(() => doSearch(q), 300);
+    });
+
+    async function doSearch(q: string) {
+      searchList.innerHTML = '<div class="loading-text">Buscando...</div>';
+      searchResults.classList.add('show');
+
+      const res = await fetch(`/api/trainers?q=${encodeURIComponent(q)}`);
+      const { trainers } = await res.json();
+
+      if (!trainers || trainers.length === 0) {
+        searchList.innerHTML = '<div class="loading-text">No se encontraron entrenadores</div>';
+        return;
+      }
+
+      searchList.innerHTML = trainers.map((t: any) => {
+        let actionHtml = '';
+        if (t.status === 'active') {
+          actionHtml = '<span class="status-active">Ya eres alumno</span>';
+        } else if (t.status === 'pending') {
+          actionHtml = '<button class="btn-sm btn-disabled" disabled>Solicitud pendiente...</button>';
+        } else {
+          actionHtml = `<button class="btn-sm btn-primary send-request-btn" data-id="${t.id}" data-name="${t.name}">Enviar solicitud</button>`;
+        }
+        return `
+          <div class="card">
+            <div class="card-row">
+              <div class="card-info">
+                <div class="card-name">${t.name} <span class="card-username">@${t.username}</span></div>
+              </div>
+              ${actionHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Bind send request buttons
+      searchList.querySelectorAll('.send-request-btn').forEach(btn => {
+        btn.addEventListener('click', () => openRequestModal(
+          (btn as HTMLElement).dataset.id!,
+          (btn as HTMLElement).dataset.name!
+        ));
+      });
+    }
+
+    // Request modal
+    const requestModal = document.getElementById('requestModal')!;
+    const requestMessage = document.getElementById('requestMessage') as HTMLTextAreaElement;
+    const cancelModal = document.getElementById('cancelModal')!;
+    const confirmRequest = document.getElementById('confirmRequest')!;
+    let pendingTrainerId = '';
+
+    function openRequestModal(trainerId: string, trainerName: string) {
+      pendingTrainerId = trainerId;
+      requestMessage.value = '';
+      requestModal.querySelector('h3')!.textContent = `SOLICITUD A ${trainerName.toUpperCase()}`;
+      requestModal.classList.add('show');
+    }
+
+    cancelModal.addEventListener('click', () => requestModal.classList.remove('show'));
+    requestModal.addEventListener('click', (e) => {
+      if (e.target === requestModal) requestModal.classList.remove('show');
+    });
+
+    confirmRequest.addEventListener('click', async () => {
+      confirmRequest.textContent = 'Enviando...';
+      (confirmRequest as HTMLButtonElement).disabled = true;
+
+      const res = await fetch('/api/trainer-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trainer_id: pendingTrainerId,
+          message: requestMessage.value.trim() || null
+        })
+      });
+
+      if (res.ok) {
+        requestModal.classList.remove('show');
+        // Refresh search to show updated status
+        if (searchInput.value.trim().length >= 2) {
+          doSearch(searchInput.value.trim());
+        }
+        // Reload to update pending section
+        window.location.reload();
+      } else {
+        const { error } = await res.json();
+        alert(error || 'Error al enviar solicitud');
+      }
+
+      confirmRequest.textContent = 'Enviar';
+      (confirmRequest as HTMLButtonElement).disabled = false;
+    });
+
+    // Cancel pending request
+    document.querySelectorAll('.cancel-request-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id!;
+        if (!confirm('Cancelar esta solicitud?')) return;
+
+        const res = await fetch(`/api/trainer-requests?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          btn.closest('.card')?.remove();
+        }
+      });
+    });
+
+    // Leave trainer
+    document.querySelectorAll('.leave-trainer-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id!;
+        const name = (btn as HTMLElement).dataset.name!;
+        if (!confirm(`Dejar de entrenar con ${name}?`)) return;
+
+        const res = await fetch(`/api/trainer-students?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          btn.closest('.card')?.remove();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

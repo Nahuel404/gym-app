@@ -232,6 +232,70 @@ if (!user) {
       color: var(--accent-orange);
     }
 
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+    }
+
+    .toggle-label {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .toggle-desc {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: var(--space-1);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      transition: all var(--transition-normal);
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 2px;
+      bottom: 2px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      transition: all var(--transition-normal);
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background: var(--accent-green-soft);
+      border-color: var(--accent-green);
+    }
+
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+      background: var(--accent-green);
+    }
+
     .user-info {
       display: flex;
       align-items: center;
@@ -268,6 +332,22 @@ if (!user) {
   </header>
 
   <main>
+    <!-- Trainer Toggle Section -->
+    <div class="section">
+      <h2 class="section-title">Entrenador</h2>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Modo entrenador</div>
+          <div class="toggle-desc">Otros usuarios podrán buscarte como entrenador y enviarte solicitudes.</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="trainerToggle" checked={user.is_trainer}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="status-msg" id="trainerStatus"></div>
+    </div>
+
     <!-- MCP Connection Section -->
     <div class="section">
       <h2 class="section-title">Conexión MCP — Claude AI</h2>
@@ -406,6 +486,33 @@ if (!user) {
     });
 
     checkKey();
+
+    // Trainer toggle
+    const trainerToggle = document.getElementById('trainerToggle') as HTMLInputElement;
+    const trainerStatus = document.getElementById('trainerStatus')!;
+
+    trainerToggle.addEventListener('change', async () => {
+      try {
+        const res = await fetch('/api/user/trainer-status', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_trainer: trainerToggle.checked })
+        });
+        if (res.ok) {
+          trainerStatus.textContent = trainerToggle.checked ? 'Modo entrenador activado' : 'Modo entrenador desactivado';
+          trainerStatus.className = 'status-msg show success';
+        } else {
+          trainerToggle.checked = !trainerToggle.checked;
+          trainerStatus.textContent = 'Error al cambiar estado';
+          trainerStatus.className = 'status-msg show error';
+        }
+      } catch {
+        trainerToggle.checked = !trainerToggle.checked;
+        trainerStatus.textContent = 'Error de conexión';
+        trainerStatus.className = 'status-msg show error';
+      }
+      setTimeout(() => { trainerStatus.className = 'status-msg'; }, 3000);
+    });
   </script>
 </body>
 </html>

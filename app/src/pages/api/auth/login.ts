@@ -17,7 +17,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Buscar usuario por username
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, name, password_hash, role')
+      .select('id, username, name, password_hash, role, is_trainer')
       .eq('username', username)
       .single()
 
@@ -43,7 +43,8 @@ export const POST: APIRoute = async ({ request }) => {
       id: user.id,
       username: user.username,
       name: user.name,
-      role: user.role
+      role: user.role,
+      is_trainer: user.is_trainer ?? false
     })
 
     // Responder con cookie de sesión

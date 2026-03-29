@@ -30,6 +30,7 @@ interface AuthenticatedUser {
   id: string;
   username: string;
   name: string;
+  is_trainer: boolean;
 }
 
 async function validateApiKey(
@@ -42,7 +43,7 @@ async function validateApiKey(
 
   const { data: user, error } = await supabase
     .from("users")
-    .select("id, username, name")
+    .select("id, username, name, is_trainer")
     .eq("mcp_api_key", apiKey)
     .single();
 
@@ -74,7 +75,7 @@ function formatVariant(
 // TOOL REGISTRATION
 // =============================================================================
 
-function registerTools(server: McpServer, userId: string) {
+function registerTools(server: McpServer, userId: string, isTrainer: boolean) {
   // ----- Tool 1: get_recent_workouts -----
   server.tool(
     "get_recent_workouts",
@@ -525,18 +526,385 @@ function registerTools(server: McpServer, userId: string) {
       };
     }
   );
+
+  // =========================================================================
+  // TRAINER-ONLY TOOLS (solo se registran si el usuario es entrenador)
+  // =========================================================================
+  if (!isTrainer) return;
+
+  async function verifyStudent(trainerId: string, studentId: string): Promise<{ name: string; username: string } | null> {
+    const { data } = await supabase
+      .from("trainer_students")
+      .select("student:users!trainer_students_student_id_fkey(name, username)")
+      .eq("trainer_id", trainerId)
+      .eq("student_id", studentId)
+      .single();
+    if (!data) return null;
+    const s = (data as any).student;
+    return { name: s.name, username: s.username };
+  }
+
+  // ----- Tool 6: list_students -----
+  server.tool(
+    "list_students",
+    "Lista todos los alumnos activos del entrenador con estadísticas resumidas (entrenamientos, volumen, último entreno).",
+    {},
+    async () => {
+      const { data: relations, error } = await supabase
+        .from("trainer_students")
+        .select("student_id, started_at, student:users!trainer_students_student_id_fkey(name, username)")
+        .eq("trainer_id", userId)
+        .order("started_at", { ascending: false });
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      if (!relations || relations.length === 0) {
+        return { content: [{ type: "text" as const, text: "No tienes alumnos activos." }] };
+      }
+
+      const students = [];
+      for (const rel of relations) {
+        const s = (rel as any).student;
+        const sid = rel.student_id;
+
+        const { count } = await supabase
+          .from("workouts")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", sid);
+
+        const { data: lastW } = await supabase
+          .from("workouts")
+          .select("workout_date")
+          .eq("user_id", sid)
+          .order("workout_date", { ascending: false })
+          .limit(1);
+
+        const { data: volData } = await supabase
+          .from("exercise_history")
+          .select("weight, reps")
+          .eq("user_id", sid);
+
+        const totalVolume = volData?.reduce((acc, h) => acc + Number(h.weight) * h.reps, 0) || 0;
+
+        students.push({
+          id: sid,
+          name: s.name,
+          username: s.username,
+          started_at: rel.started_at,
+          total_workouts: count || 0,
+          last_workout_date: lastW?.[0]?.workout_date || null,
+          total_volume_kg: Math.round(totalVolume),
+        });
+      }
+
+      return { content: [{ type: "text" as const, text: JSON.stringify(students, null, 2) }] };
+    }
+  );
+
+  // ----- Tool 7: get_student_workouts -----
+  server.tool(
+    "get_student_workouts",
+    "Obtiene los entrenamientos recientes de un alumno específico. Solo accesible si es tu alumno.",
+    {
+      student_id: z.string().describe("ID del alumno"),
+      days: z.number().min(1).max(365).default(30).describe("Días hacia atrás (default 30)"),
+    },
+    async ({ student_id, days }) => {
+      const student = await verifyStudent(userId, student_id);
+      if (!student) {
+        return { content: [{ type: "text" as const, text: "Error: no es tu alumno o no existe la relación." }] };
+      }
+
+      const since = daysAgoDate(days);
+      const { data: workouts, error } = await supabase
+        .from("workouts")
+        .select(`
+          id, workout_date, notes,
+          exercise_history (
+            sets, weight, reps,
+            variant_equipment, variant_grip, variant_position,
+            exercises ( name, muscle_group )
+          )
+        `)
+        .eq("user_id", student_id)
+        .gte("workout_date", since)
+        .order("workout_date", { ascending: false });
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      if (!workouts || workouts.length === 0) {
+        return { content: [{ type: "text" as const, text: `${student.name} no tiene entrenamientos en los últimos ${days} días.` }] };
+      }
+
+      const result = workouts.map((w: any) => {
+        const exerciseMap = new Map<string, any>();
+        for (const entry of w.exercise_history || []) {
+          const exercise = entry.exercises;
+          const variant = formatVariant(entry.variant_equipment, entry.variant_grip, entry.variant_position);
+          const key = `${exercise.name}|${variant || ""}`;
+          if (!exerciseMap.has(key)) {
+            exerciseMap.set(key, { name: exercise.name, muscle_group: exercise.muscle_group, variant, sets: [] });
+          }
+          exerciseMap.get(key).sets.push({ set: entry.sets, weight: Number(entry.weight), reps: entry.reps });
+        }
+        return { date: w.workout_date, notes: w.notes, exercises: Array.from(exerciseMap.values()) };
+      });
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ student_name: student.name, workouts: result }, null, 2) }],
+      };
+    }
+  );
+
+  // ----- Tool 8: get_student_exercise_progress -----
+  server.tool(
+    "get_student_exercise_progress",
+    "Progresión histórica de un ejercicio específico de un alumno: peso máximo, volumen y tendencia.",
+    {
+      student_id: z.string().describe("ID del alumno"),
+      exercise_name: z.string().describe("Nombre del ejercicio"),
+      days: z.number().min(1).max(730).default(90).describe("Días hacia atrás (default 90)"),
+    },
+    async ({ student_id, exercise_name, days }) => {
+      const student = await verifyStudent(userId, student_id);
+      if (!student) {
+        return { content: [{ type: "text" as const, text: "Error: no es tu alumno o no existe la relación." }] };
+      }
+
+      const since = daysAgoDate(days);
+      const { data: exercises } = await supabase
+        .from("exercises")
+        .select("id, name, muscle_group")
+        .ilike("name", `%${exercise_name}%`);
+
+      if (!exercises || exercises.length === 0) {
+        return { content: [{ type: "text" as const, text: `No se encontró el ejercicio "${exercise_name}".` }] };
+      }
+
+      const exercise = exercises[0];
+      const { data: history, error } = await supabase
+        .from("exercise_history")
+        .select(`sets, weight, reps, variant_equipment, variant_grip, variant_position, workouts!inner ( workout_date )`)
+        .eq("user_id", student_id)
+        .eq("exercise_id", exercise.id)
+        .gte("workouts.workout_date", since)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      if (!history || history.length === 0) {
+        return { content: [{ type: "text" as const, text: `${student.name} no tiene registros de "${exercise.name}" en los últimos ${days} días.` }] };
+      }
+
+      const byDate = new Map<string, any[]>();
+      for (const entry of history) {
+        const date = (entry as any).workouts.workout_date;
+        if (!byDate.has(date)) byDate.set(date, []);
+        byDate.get(date)!.push(entry);
+      }
+
+      const progression = Array.from(byDate.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, entries]) => {
+          const weights = entries.map((e) => Number(e.weight));
+          const totalVolume = entries.reduce((sum, e) => sum + Number(e.weight) * e.reps, 0);
+          const totalReps = entries.reduce((sum, e) => sum + e.reps, 0);
+          return {
+            date,
+            max_weight: Math.max(...weights),
+            total_sets: entries.length,
+            total_reps: totalReps,
+            total_volume: Math.round(totalVolume),
+          };
+        });
+
+      const first = progression[0];
+      const last = progression[progression.length - 1];
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            student_name: student.name,
+            exercise: exercise.name,
+            muscle_group: exercise.muscle_group,
+            period: `${days} días`,
+            sessions: progression.length,
+            trend: {
+              weight_change: last.max_weight - first.max_weight,
+              weight_change_pct: first.max_weight > 0 ? Math.round(((last.max_weight - first.max_weight) / first.max_weight) * 100) : 0,
+              volume_change: last.total_volume - first.total_volume,
+            },
+            data_points: progression,
+          }, null, 2),
+        }],
+      };
+    }
+  );
+
+  // ----- Tool 9: get_student_summary -----
+  server.tool(
+    "get_student_summary",
+    "Resumen de entrenamiento de un alumno: frecuencia, volumen por grupo muscular, balance. Detecta desbalances.",
+    {
+      student_id: z.string().describe("ID del alumno"),
+      days: z.number().min(1).max(365).default(30).describe("Días hacia atrás (default 30)"),
+    },
+    async ({ student_id, days }) => {
+      const student = await verifyStudent(userId, student_id);
+      if (!student) {
+        return { content: [{ type: "text" as const, text: "Error: no es tu alumno o no existe la relación." }] };
+      }
+
+      const since = daysAgoDate(days);
+      const { data: workouts, error } = await supabase
+        .from("workouts")
+        .select(`workout_date, exercise_history ( sets, weight, reps, exercises ( name, muscle_group ) )`)
+        .eq("user_id", student_id)
+        .gte("workout_date", since)
+        .order("workout_date", { ascending: false });
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      if (!workouts || workouts.length === 0) {
+        return { content: [{ type: "text" as const, text: `${student.name} no tiene entrenamientos en los últimos ${days} días.` }] };
+      }
+
+      const weeks = Math.max(1, days / 7);
+      const muscleStats = new Map<string, { sessions: Set<string>; totalSets: number; totalVolume: number; totalReps: number }>();
+
+      for (const w of workouts) {
+        for (const entry of (w as any).exercise_history || []) {
+          const mg = entry.exercises.muscle_group;
+          if (!muscleStats.has(mg)) {
+            muscleStats.set(mg, { sessions: new Set(), totalSets: 0, totalVolume: 0, totalReps: 0 });
+          }
+          const stats = muscleStats.get(mg)!;
+          stats.sessions.add(w.workout_date);
+          stats.totalSets += 1;
+          stats.totalReps += entry.reps;
+          stats.totalVolume += Number(entry.weight) * entry.reps;
+        }
+      }
+
+      const muscleGroups: Record<string, any> = {};
+      for (const [mg, stats] of muscleStats) {
+        muscleGroups[mg] = {
+          sessions: stats.sessions.size,
+          total_sets: stats.totalSets,
+          total_reps: stats.totalReps,
+          total_volume_kg: Math.round(stats.totalVolume),
+          sets_per_week: Math.round((stats.totalSets / weeks) * 10) / 10,
+        };
+      }
+
+      const sorted = Object.fromEntries(
+        Object.entries(muscleGroups).sort(([, a]: any, [, b]: any) => b.total_volume_kg - a.total_volume_kg)
+      );
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            student_name: student.name,
+            period: `${days} días`,
+            total_workouts: workouts.length,
+            avg_workouts_per_week: Math.round((workouts.length / weeks) * 10) / 10,
+            muscle_groups: sorted,
+          }, null, 2),
+        }],
+      };
+    }
+  );
+
+  // ----- Tool 10: compare_students -----
+  server.tool(
+    "compare_students",
+    "Compara estadísticas de entrenamiento entre dos o más alumnos: volumen, frecuencia, consistencia.",
+    {
+      student_ids: z.array(z.string()).min(2).describe("IDs de alumnos a comparar"),
+      days: z.number().min(1).max(365).default(30).describe("Período de comparación (default 30)"),
+    },
+    async ({ student_ids, days }) => {
+      const since = daysAgoDate(days);
+      const weeks = Math.max(1, days / 7);
+      const totalWeeks = Math.ceil(days / 7);
+      const comparisons = [];
+
+      for (const sid of student_ids) {
+        const student = await verifyStudent(userId, sid);
+        if (!student) {
+          return { content: [{ type: "text" as const, text: `Error: alumno ${sid} no es tu alumno.` }] };
+        }
+
+        const { data: workouts } = await supabase
+          .from("workouts")
+          .select(`workout_date, exercise_history ( sets, weight, reps, exercises ( muscle_group ) )`)
+          .eq("user_id", sid)
+          .gte("workout_date", since);
+
+        const wks = workouts || [];
+        const uniqueWeeks = new Set(wks.map(w => {
+          const d = new Date(w.workout_date);
+          const jan1 = new Date(d.getFullYear(), 0, 1);
+          return `${d.getFullYear()}-W${Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7)}`;
+        }));
+
+        const muscleVolume: Record<string, number> = {};
+        let totalVol = 0;
+        let totalSets = 0;
+        for (const w of wks) {
+          for (const e of (w as any).exercise_history || []) {
+            const vol = Number(e.weight) * e.reps;
+            totalVol += vol;
+            totalSets += 1;
+            const mg = e.exercises.muscle_group;
+            muscleVolume[mg] = (muscleVolume[mg] || 0) + vol;
+          }
+        }
+
+        comparisons.push({
+          id: sid,
+          name: student.name,
+          username: student.username,
+          total_workouts: wks.length,
+          avg_workouts_per_week: Math.round((wks.length / weeks) * 10) / 10,
+          total_volume_kg: Math.round(totalVol),
+          total_sets: totalSets,
+          consistency_pct: Math.round((uniqueWeeks.size / totalWeeks) * 100),
+          muscle_groups: Object.fromEntries(
+            Object.entries(muscleVolume)
+              .sort(([, a], [, b]) => b - a)
+              .map(([mg, vol]) => [mg, Math.round(vol)])
+          ),
+        });
+      }
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(comparisons, null, 2) }],
+      };
+    }
+  );
 }
 
 // =============================================================================
 // MCP SERVER FACTORY
 // =============================================================================
 
-function createGymServer(userId: string): McpServer {
+function createGymServer(userId: string, isTrainer: boolean): McpServer {
   const server = new McpServer({
     name: "gym-tracker",
     version: "1.0.0",
   });
-  registerTools(server, userId);
+  registerTools(server, userId, isTrainer);
   return server;
 }
 
@@ -585,7 +953,7 @@ app.post("/mcp", async (req: Request, res: Response) => {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });
-  const server = createGymServer(user.id);
+  const server = createGymServer(user.id, user.is_trainer);
   await server.connect(transport);
   await transport.handleRequest(req, res, req.body);
 });

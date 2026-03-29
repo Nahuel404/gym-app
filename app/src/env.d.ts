@@ -18,6 +18,7 @@ declare namespace App {
       username: string
       name: string
       role: 'admin' | 'user'
+      is_trainer: boolean
     } | null
   }
 }

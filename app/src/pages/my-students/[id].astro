@@ -1,12 +1,40 @@
 ---
-import '../styles/global.css';
-import { supabase } from '../lib/supabase';
-import { formatFullDate } from '../lib/dates';
+import '../../styles/global.css';
+import { supabase } from '../../lib/supabase';
+import { formatFullDate } from '../../lib/dates';
 
 const user = Astro.locals.user;
+if (!user || !user.is_trainer) {
+  return Astro.redirect('/');
+}
 
-// Obtener workouts del usuario
-const { data: workoutsData, error } = await supabase
+const studentId = Astro.params.id;
+
+// Verificar relación
+const { data: rel } = await supabase
+  .from('trainer_students')
+  .select('id')
+  .eq('trainer_id', user.id)
+  .eq('student_id', studentId)
+  .single();
+
+if (!rel) {
+  return Astro.redirect('/my-students');
+}
+
+// Datos del alumno
+const { data: studentData } = await supabase
+  .from('users')
+  .select('id, name, username')
+  .eq('id', studentId)
+  .single();
+
+if (!studentData) {
+  return Astro.redirect('/my-students');
+}
+
+// Workouts del alumno
+const { data: workoutsData } = await supabase
   .from('workouts')
   .select(`
     id,
@@ -26,17 +54,16 @@ const { data: workoutsData, error } = await supabase
       )
     )
   `)
-  .eq('user_id', user?.id)
+  .eq('user_id', studentId)
   .order('workout_date', { ascending: false });
 
 const workoutDays = workoutsData?.map(workout => {
   const exercises = workout.exercise_history || [];
-  const totalVolume = exercises.reduce((acc, e) => acc + (e.weight * e.reps), 0);
-  const uniqueExercises = [...new Set(exercises.map(e => e.exercises?.id))].length;
+  const totalVolume = exercises.reduce((acc: number, e: any) => acc + (e.weight * e.reps), 0);
+  const uniqueExercises = [...new Set(exercises.map((e: any) => e.exercises?.id))].length;
 
-  // Agrupar ejercicios por ejercicio + variantes
-  const exercisesGrouped = new Map<string, typeof exercises>();
-  exercises.forEach(e => {
+  const exercisesGrouped = new Map<string, any[]>();
+  exercises.forEach((e: any) => {
     const exId = e.exercises?.id || 'unknown';
     const variantKey = `${exId}-${e.variant_equipment || ''}-${e.variant_grip || ''}-${e.variant_position || ''}`;
     if (!exercisesGrouped.has(variantKey)) {
@@ -53,7 +80,7 @@ const workoutDays = workoutsData?.map(workout => {
     exerciseCount: uniqueExercises,
     setCount: exercises.length,
     exercises: Array.from(exercisesGrouped.entries()).map(([key, sets]) => {
-      const variants = [];
+      const variants: string[] = [];
       if (sets[0].variant_equipment) variants.push(sets[0].variant_equipment);
       if (sets[0].variant_grip) variants.push(sets[0].variant_grip);
       if (sets[0].variant_position) variants.push(sets[0].variant_position);
@@ -63,7 +90,7 @@ const workoutDays = workoutsData?.map(workout => {
         name: sets[0].exercises?.name || 'Ejercicio',
         muscle: sets[0].exercises?.muscle_group || '',
         variant: variants.length > 0 ? variants.join(' · ') : '',
-        sets: sets.map(s => ({
+        sets: sets.map((s: any) => ({
           weight: s.weight,
           reps: s.reps
         }))
@@ -78,7 +105,7 @@ const workoutDays = workoutsData?.map(workout => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Historial - GymApp</title>
+  <title>Historial de {studentData.name} - GymApp</title>
   <style>
     .app-header {
       background: var(--bg-secondary);
@@ -134,46 +161,6 @@ const workoutDays = workoutsData?.map(workout => {
       }
     }
 
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-
-    @media (min-width: 768px) {
-      .header-actions {
-        gap: var(--space-3);
-      }
-    }
-
-    .header-btn {
-      padding: var(--space-1) var(--space-2);
-      border-radius: 6px;
-      font-size: 0.65rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      text-decoration: none;
-      transition: all var(--transition-fast);
-      border: 1px solid var(--border-light);
-      background: transparent;
-      color: var(--text-secondary);
-      white-space: nowrap;
-    }
-
-    @media (min-width: 768px) {
-      .header-btn {
-        padding: var(--space-2) var(--space-4);
-        font-size: 0.75rem;
-        letter-spacing: 1px;
-      }
-    }
-
-    .header-btn:hover {
-      border-color: var(--text-muted);
-      color: var(--text-primary);
-    }
-
     main {
       padding: var(--space-4);
       max-width: 900px;
@@ -221,7 +208,6 @@ const workoutDays = workoutsData?.map(workout => {
       }
     }
 
-    /* Stats summary */
     .stats-summary {
       display: grid;
       grid-template-columns: 1fr;
@@ -284,7 +270,6 @@ const workoutDays = workoutsData?.map(workout => {
       }
     }
 
-    /* Workout day cards */
     .workout-day {
       background: var(--bg-card);
       border: 1px solid var(--border);
@@ -364,6 +349,13 @@ const workoutDays = workoutsData?.map(workout => {
       font-weight: 500;
     }
 
+    .day-right {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+      flex-shrink: 0;
+    }
+
     .day-volume {
       font-family: var(--font-display);
       font-size: 0.75rem;
@@ -386,51 +378,6 @@ const workoutDays = workoutsData?.map(workout => {
       transform: rotate(180deg);
     }
 
-    .day-actions {
-      display: flex;
-      gap: var(--space-1);
-      align-items: center;
-      flex-shrink: 0;
-    }
-
-    @media (min-width: 768px) {
-      .day-actions {
-        gap: var(--space-2);
-      }
-    }
-
-    .btn-edit, .btn-delete-workout {
-      padding: var(--space-1);
-      border-radius: 4px;
-      font-size: 0.6rem;
-      cursor: pointer;
-      transition: all var(--transition-fast);
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-muted);
-      white-space: nowrap;
-    }
-
-    @media (min-width: 768px) {
-      .btn-edit, .btn-delete-workout {
-        padding: var(--space-1) var(--space-2);
-        font-size: 0.7rem;
-      }
-    }
-
-    .btn-edit:hover {
-      border-color: var(--accent-orange);
-      color: var(--accent-orange);
-      background: rgba(255, 159, 10, 0.1);
-    }
-
-    .btn-delete-workout:hover {
-      border-color: var(--accent-red);
-      color: var(--accent-red);
-      background: var(--accent-red-soft);
-    }
-
-    /* Exercise details */
     .day-content {
       display: none;
       padding: var(--space-3);
@@ -532,17 +479,10 @@ const workoutDays = workoutsData?.map(workout => {
       margin-left: var(--space-1);
     }
 
-    /* Empty state */
     .empty-state {
       text-align: center;
       padding: var(--space-8);
       color: var(--text-muted);
-    }
-
-    .empty-icon {
-      font-size: 3rem;
-      opacity: 0.3;
-      margin-bottom: var(--space-4);
     }
 
     .empty-title {
@@ -554,41 +494,14 @@ const workoutDays = workoutsData?.map(workout => {
 
     .empty-text {
       font-size: 0.875rem;
-      margin-bottom: var(--space-6);
-    }
-
-    .quick-action {
-      padding: var(--space-3) var(--space-5);
-      background: var(--text-primary);
-      color: var(--text-dark);
-      border: none;
-      border-radius: 8px;
-      font-family: var(--font-display);
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all var(--transition-normal);
-      text-decoration: none;
-      display: inline-block;
-    }
-
-    .quick-action:hover {
-      opacity: 0.9;
     }
   </style>
 </head>
 <body>
   <header class="app-header">
     <div class="header-left">
-      <a href="/" class="back-btn">← Volver</a>
+      <a href="/my-students" class="back-btn">&larr; Mis Alumnos</a>
       <span class="page-title">HISTORIAL</span>
-    </div>
-    <div class="header-actions">
-      <a href="/favorites" class="header-btn">Favoritos</a>
-      <a href="/trainers" class="header-btn">Entrenadores</a>
-      <a href="/workout/new" class="header-btn">Nuevo</a>
     </div>
   </header>
 
@@ -596,8 +509,8 @@ const workoutDays = workoutsData?.map(workout => {
     {workoutDays.length > 0 ? (
       <>
         <div class="page-header">
-          <h1>HISTORIAL DE ENTRENAMIENTOS</h1>
-          <p>Revisa tu progreso y entrenamientos anteriores</p>
+          <h1>HISTORIAL DE {studentData.name.toUpperCase()}</h1>
+          <p>@{studentData.username} &middot; {workoutDays.length} entrenamientos</p>
         </div>
 
         <div class="stats-summary">
@@ -618,7 +531,7 @@ const workoutDays = workoutsData?.map(workout => {
         </div>
 
         {workoutDays.map((day, index) => (
-          <div class={`workout-day ${index === 0 ? 'open' : ''}`} data-day={day.date} data-id={day.id}>
+          <div class={`workout-day ${index === 0 ? 'open' : ''}`}>
             <div class="day-header">
               <div>
                 <div class="day-date">{day.formattedDate}</div>
@@ -627,9 +540,7 @@ const workoutDays = workoutsData?.map(workout => {
                   <span class="day-stat"><span>{day.setCount}</span> series</span>
                 </div>
               </div>
-              <div class="day-actions">
-                <button type="button" class="btn-edit" data-id={day.id}>Editar</button>
-                <button type="button" class="btn-delete-workout" data-id={day.id}>Eliminar</button>
+              <div class="day-right">
                 <div class="day-volume">{(day.totalVolume / 1000).toFixed(1)}t</div>
                 <span class="day-toggle">v</span>
               </div>
@@ -641,7 +552,7 @@ const workoutDays = workoutsData?.map(workout => {
                   {exercise.variant && <div class="exercise-variant">{exercise.variant}</div>}
                   <div class="exercise-muscle">{exercise.muscle}</div>
                   <div class="sets-grid">
-                    {exercise.sets.map((set, setIndex) => (
+                    {exercise.sets.map((set) => (
                       <div class="set-chip">
                         <span class="weight">{set.weight}kg</span>
                         <span class="reps">x{set.reps}</span>
@@ -656,78 +567,16 @@ const workoutDays = workoutsData?.map(workout => {
       </>
     ) : (
       <div class="empty-state">
-        <div class="empty-icon">◇</div>
         <h2 class="empty-title">SIN HISTORIAL</h2>
-        <p class="empty-text">
-          Aun no tienes entrenamientos registrados.<br>
-          Comienza a trackear tu progreso.
-        </p>
-        <a href="/workout/new" class="quick-action">
-          + Primer Entrenamiento
-        </a>
+        <p class="empty-text">{studentData.name} aun no tiene entrenamientos registrados.</p>
       </div>
     )}
   </main>
 
   <script>
-    // Toggle de día
     document.querySelectorAll('.day-header').forEach(header => {
-      header.addEventListener('click', (e) => {
-        // No toggle si se clickeó un botón
-        if (e.target.closest('button')) return;
-
-        const day = header.closest('.workout-day');
-        day?.classList.toggle('open');
-      });
-    });
-
-    // Eliminar workout
-    document.querySelectorAll('.btn-delete-workout').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const workoutId = e.target.dataset.id;
-
-        if (!confirm('¿Estás seguro de eliminar este entrenamiento? Esta acción no se puede deshacer.')) {
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'Eliminando...';
-
-        try {
-          const response = await fetch(`/api/workouts?id=${workoutId}`, {
-            method: 'DELETE'
-          });
-
-          if (response.ok) {
-            // Remover del DOM
-            const workoutDay = document.querySelector(`[data-id="${workoutId}"]`);
-            if (workoutDay) {
-              workoutDay.remove();
-            }
-            // Recargar para actualizar estadísticas
-            setTimeout(() => window.location.reload(), 500);
-          } else {
-            const data = await response.json();
-            alert(data.message || 'Error al eliminar el entrenamiento');
-            btn.disabled = false;
-            btn.textContent = 'Eliminar';
-          }
-        } catch (err) {
-          console.error('Error:', err);
-          alert('Error al eliminar el entrenamiento');
-          btn.disabled = false;
-          btn.textContent = 'Eliminar';
-        }
-      });
-    });
-
-    // Editar workout
-    document.querySelectorAll('.btn-edit').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const workoutId = e.target.dataset.id;
-        window.location.href = `/workout/edit/${workoutId}`;
+      header.addEventListener('click', () => {
+        header.closest('.workout-day')?.classList.toggle('open');
       });
     });
   </script>

@@ -12,6 +12,7 @@ export interface User {
   username: string
   name: string
   role: 'admin' | 'user'
+  is_trainer: boolean
 }
 
 export interface JWTPayload {
@@ -19,6 +20,7 @@ export interface JWTPayload {
   username: string
   name: string
   role: 'admin' | 'user'
+  is_trainer: boolean
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -34,7 +36,8 @@ export async function createSession(user: User): Promise<string> {
     id: user.id,
     username: user.username,
     name: user.name,
-    role: user.role
+    role: user.role,
+    is_trainer: user.is_trainer
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
