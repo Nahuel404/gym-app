@@ -430,16 +430,16 @@ function lastWorkoutAgo(dateStr: string | null): string {
       margin-bottom: var(--space-4);
     }
 
-    .workout-day {
+    :global(.workout-day) {
       margin-bottom: var(--space-4);
     }
 
-    .workout-day + .workout-day {
+    :global(.workout-day + .workout-day) {
       padding-top: var(--space-4);
       border-top: 1px solid var(--border);
     }
 
-    .workout-date {
+    :global(.workout-date) {
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--text-primary);
@@ -447,36 +447,36 @@ function lastWorkoutAgo(dateStr: string | null): string {
       margin-bottom: var(--space-2);
     }
 
-    .workout-table {
+    :global(.workout-table) {
       width: 100%;
       border-collapse: collapse;
     }
 
-    .workout-table td {
+    :global(.workout-table td) {
       padding: var(--space-2) 0;
       vertical-align: top;
       border-bottom: 1px solid var(--border);
     }
 
-    .workout-table tr:last-child td {
+    :global(.workout-table tr:last-child td) {
       border-bottom: none;
     }
 
-    .workout-table .td-exercise {
+    :global(.workout-table .td-exercise) {
       color: var(--text-primary);
       font-size: 0.8rem;
       font-weight: 500;
       padding-right: var(--space-3);
     }
 
-    .workout-table .td-sets {
+    :global(.workout-table .td-sets) {
       color: var(--text-muted);
       font-size: 0.75rem;
       text-align: right;
       white-space: nowrap;
     }
 
-    .workout-total {
+    :global(.workout-total) {
       font-size: 0.7rem;
       color: var(--text-muted);
       text-align: right;
@@ -485,7 +485,7 @@ function lastWorkoutAgo(dateStr: string | null): string {
       border-top: 1px solid var(--border);
     }
 
-    .workout-total span {
+    :global(.workout-total span) {
       color: var(--accent-green);
       font-family: var(--font-display);
     }
@@ -503,7 +503,7 @@ function lastWorkoutAgo(dateStr: string | null): string {
       color: var(--text-primary);
     }
 
-    .loading-text {
+    :global(.loading-text) {
       color: var(--text-muted);
       font-size: 0.8rem;
       padding: var(--space-3);
