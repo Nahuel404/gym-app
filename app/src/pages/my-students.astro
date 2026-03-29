@@ -29,10 +29,11 @@ const students: any[] = [];
 for (const rel of studentsData || []) {
   const s = rel.student as any;
 
-  const { count: totalWorkouts } = await supabase
+  const { data: workoutDates } = await supabase
     .from('workouts')
-    .select('id', { count: 'exact', head: true })
+    .select('workout_date')
     .eq('user_id', s.id);
+  const totalWorkouts = new Set(workoutDates?.map(w => w.workout_date)).size;
 
   const { data: lastWk } = await supabase
     .from('workouts')
@@ -449,23 +450,12 @@ function lastWorkoutAgo(dateStr: string | null): string {
     .workout-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.75rem;
-    }
-
-    .workout-table th {
-      text-align: left;
-      font-size: 0.6rem;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-      padding: var(--space-1) var(--space-2);
-      border-bottom: 1px solid var(--border);
     }
 
     .workout-table td {
-      padding: var(--space-1) var(--space-2);
+      padding: var(--space-2) 0;
       vertical-align: top;
-      border-bottom: 1px solid var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
     }
 
     .workout-table tr:last-child td {
@@ -473,28 +463,26 @@ function lastWorkoutAgo(dateStr: string | null): string {
     }
 
     .workout-table .td-exercise {
-      color: var(--text-secondary);
+      color: var(--text-primary);
+      font-size: 0.8rem;
       font-weight: 500;
-      white-space: nowrap;
+      padding-right: var(--space-3);
     }
 
     .workout-table .td-sets {
       color: var(--text-muted);
-    }
-
-    .workout-table .td-vol {
-      color: var(--accent-green);
-      font-family: var(--font-display);
-      font-size: 0.65rem;
-      white-space: nowrap;
+      font-size: 0.75rem;
       text-align: right;
+      white-space: nowrap;
     }
 
     .workout-total {
-      font-size: 0.65rem;
+      font-size: 0.7rem;
       color: var(--text-muted);
       text-align: right;
-      margin-top: var(--space-1);
+      margin-top: var(--space-2);
+      padding-top: var(--space-2);
+      border-top: 1px solid var(--border);
     }
 
     .workout-total span {
@@ -708,51 +696,49 @@ function lastWorkoutAgo(dateStr: string | null): string {
               return;
             }
 
-            // Show last 5 workouts
-            const recent = workouts.slice(0, 5);
+            // Agrupar workouts por fecha (mismo día = 1 entrenamiento)
+            const byDate = new Map();
+            for (const w of workouts) {
+              if (!byDate.has(w.workout_date)) byDate.set(w.workout_date, []);
+              byDate.get(w.workout_date).push(...(w.exercise_history || []));
+            }
+
+            const recentDates = Array.from(byDate.keys()).slice(0, 5);
             let html = '';
 
-            for (const w of recent) {
-              const date = new Date(w.workout_date + 'T12:00:00').toLocaleDateString('es-AR', {
+            for (const dateKey of recentDates) {
+              const allHistory = byDate.get(dateKey);
+              const date = new Date(dateKey + 'T12:00:00').toLocaleDateString('es-AR', {
                 weekday: 'long', day: 'numeric', month: 'short', year: 'numeric'
               });
 
               // Group exercises
-              const exMap = new Map<string, any[]>();
-              for (const h of w.exercise_history || []) {
+              const exMap = new Map();
+              for (const h of allHistory) {
                 const ex = h.exercises;
                 const parts = [h.variant_equipment, h.variant_grip, h.variant_position].filter(Boolean);
                 const variant = parts.length > 0 ? ` · ${parts.join(' · ')}` : '';
                 const key = `${ex.id}${variant}`;
                 if (!exMap.has(key)) exMap.set(key, []);
-                exMap.get(key)!.push({ ...h, displayName: `${ex.name}${variant}` });
+                exMap.get(key).push({ ...h, displayName: `${ex.name}${variant}` });
               }
 
               let rows = '';
               let dayVolume = 0;
               for (const [, sets] of exMap) {
-                const setsStr = sets.map((s: any) => `${s.weight}×${s.reps}`).join(' · ');
-                const vol = sets.reduce((a: number, s: any) => a + s.weight * s.reps, 0);
-                dayVolume += vol;
+                const setsStr = sets.map((s) => `${s.weight}×${s.reps}`).join(' · ');
+                dayVolume += sets.reduce((a, s) => a + s.weight * s.reps, 0);
                 rows += `<tr>
                   <td class="td-exercise">${sets[0].displayName}</td>
                   <td class="td-sets">${setsStr}</td>
-                  <td class="td-vol">${(vol / 1000).toFixed(2)}t</td>
                 </tr>`;
               }
 
               html += `
                 <div class="workout-day">
                   <div class="workout-date">${date}</div>
-                  <table class="workout-table">
-                    <thead><tr>
-                      <th>Ejercicio</th>
-                      <th>Series</th>
-                      <th style="text-align:right">Vol</th>
-                    </tr></thead>
-                    <tbody>${rows}</tbody>
-                  </table>
-                  <div class="workout-total">Total: <span>${(dayVolume / 1000).toFixed(1)}t</span></div>
+                  <table class="workout-table"><tbody>${rows}</tbody></table>
+                  <div class="workout-total">Volumen: <span>${(dayVolume / 1000).toFixed(1)}t</span></div>
                 </div>
               `;
             }

@@ -59,27 +59,26 @@ const now = new Date();
 const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-const totalWorkouts = workoutsData?.length || 0;
+// Días únicos de entrenamiento (1 día = 1 entrenamiento sin importar cuántos registros)
+const uniqueDates = [...new Set(workoutsData?.map(w => w.workout_date) || [])];
+const totalWorkouts = uniqueDates.length;
 const totalVolume = historyData.reduce((acc, h) => acc + (h.weight * h.reps), 0);
 
-// Entrenamientos esta semana
-const thisWeek = workoutsData?.filter(w => {
-  const date = parseLocalDate(w.workout_date);
-  return date >= oneWeekAgo;
-}).length || 0;
+// Entrenamientos esta semana (días únicos)
+const thisWeek = uniqueDates.filter(d => parseLocalDate(d) >= oneWeekAgo).length;
 
-// Calcular racha actual
+// Calcular racha actual (días únicos, ordenados descendente)
 let currentStreak = 0;
-const sortedWorkouts = workoutsData
-  ?.map(w => parseLocalDate(w.workout_date))
-  .sort((a, b) => b.getTime() - a.getTime()) || [];
+const sortedUniqueDates = uniqueDates
+  .map(d => parseLocalDate(d))
+  .sort((a, b) => b.getTime() - a.getTime());
 
-if (sortedWorkouts.length > 0) {
+if (sortedUniqueDates.length > 0) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   let checkDate = new Date(today);
 
-  for (const workoutDate of sortedWorkouts) {
+  for (const workoutDate of sortedUniqueDates) {
     const wd = new Date(workoutDate);
     wd.setHours(0, 0, 0, 0);
 

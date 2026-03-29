@@ -57,8 +57,16 @@ const { data: workoutsData } = await supabase
   .eq('user_id', studentId)
   .order('workout_date', { ascending: false });
 
-const workoutDays = workoutsData?.map(workout => {
-  const exercises = workout.exercise_history || [];
+// Agrupar workouts por fecha (mismo día = 1 entrenamiento)
+const workoutsByDate = new Map<string, any[]>();
+workoutsData?.forEach(workout => {
+  const date = workout.workout_date;
+  if (!workoutsByDate.has(date)) workoutsByDate.set(date, []);
+  workoutsByDate.get(date)!.push(workout);
+});
+
+const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts]) => {
+  const exercises = dayWorkouts.flatMap((w: any) => w.exercise_history || []);
   const totalVolume = exercises.reduce((acc: number, e: any) => acc + (e.weight * e.reps), 0);
   const uniqueExercises = [...new Set(exercises.map((e: any) => e.exercises?.id))].length;
 
@@ -66,16 +74,14 @@ const workoutDays = workoutsData?.map(workout => {
   exercises.forEach((e: any) => {
     const exId = e.exercises?.id || 'unknown';
     const variantKey = `${exId}-${e.variant_equipment || ''}-${e.variant_grip || ''}-${e.variant_position || ''}`;
-    if (!exercisesGrouped.has(variantKey)) {
-      exercisesGrouped.set(variantKey, []);
-    }
+    if (!exercisesGrouped.has(variantKey)) exercisesGrouped.set(variantKey, []);
     exercisesGrouped.get(variantKey)!.push(e);
   });
 
   return {
-    id: workout.id,
-    date: workout.workout_date,
-    formattedDate: formatFullDate(workout.workout_date),
+    id: dayWorkouts[0].id,
+    date,
+    formattedDate: formatFullDate(date),
     totalVolume,
     exerciseCount: uniqueExercises,
     setCount: exercises.length,
@@ -90,14 +96,11 @@ const workoutDays = workoutsData?.map(workout => {
         name: sets[0].exercises?.name || 'Ejercicio',
         muscle: sets[0].exercises?.muscle_group || '',
         variant: variants.length > 0 ? variants.join(' · ') : '',
-        sets: sets.map((s: any) => ({
-          weight: s.weight,
-          reps: s.reps
-        }))
+        sets: sets.map((s: any) => ({ weight: s.weight, reps: s.reps }))
       };
     })
   };
-}) || [];
+});
 ---
 
 <!DOCTYPE html>

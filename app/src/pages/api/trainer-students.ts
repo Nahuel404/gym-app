@@ -78,10 +78,11 @@ export const GET: APIRoute = async ({ url, locals }) => {
     for (const rel of data || []) {
       const student = rel.student as any;
 
-      const { count: totalWorkouts } = await supabase
+      const { data: workoutDates } = await supabase
         .from('workouts')
-        .select('id', { count: 'exact', head: true })
+        .select('workout_date')
         .eq('user_id', student.id);
+      const totalWorkouts = new Set(workoutDates?.map(w => w.workout_date)).size;
 
       const { data: lastWorkout } = await supabase
         .from('workouts')

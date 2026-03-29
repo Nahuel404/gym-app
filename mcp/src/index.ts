@@ -349,7 +349,8 @@ function registerTools(server: McpServer, userId: string, isTrainer: boolean) {
         };
       }
 
-      const totalWorkouts = workouts.length;
+      const uniqueDates = new Set(workouts.map((w: any) => w.workout_date));
+      const totalWorkouts = uniqueDates.size;
       const weeks = Math.max(1, days / 7);
       const avgPerWeek = Math.round((totalWorkouts / weeks) * 10) / 10;
 
@@ -582,10 +583,11 @@ function registerTools(server: McpServer, userId: string, isTrainer: boolean) {
         const s = (rel as any).student;
         const sid = rel.student_id;
 
-        const { count } = await supabase
+        const { data: wkDates } = await supabase
           .from("workouts")
-          .select("id", { count: "exact", head: true })
+          .select("workout_date")
           .eq("user_id", sid);
+        const uniqueWorkoutCount = new Set(wkDates?.map(w => w.workout_date)).size;
 
         const { data: lastW } = await supabase
           .from("workouts")
@@ -606,7 +608,7 @@ function registerTools(server: McpServer, userId: string, isTrainer: boolean) {
           name: s.name,
           username: s.username,
           started_at: rel.started_at,
-          total_workouts: count || 0,
+          total_workouts: uniqueWorkoutCount,
           last_workout_date: lastW?.[0]?.workout_date || null,
           total_volume_kg: Math.round(totalVolume),
         });
@@ -829,8 +831,8 @@ function registerTools(server: McpServer, userId: string, isTrainer: boolean) {
           text: JSON.stringify({
             student_name: student.name,
             period: `${days} días`,
-            total_workouts: workouts.length,
-            avg_workouts_per_week: Math.round((workouts.length / weeks) * 10) / 10,
+            total_workouts: new Set(workouts.map((w: any) => w.workout_date)).size,
+            avg_workouts_per_week: Math.round((new Set(workouts.map((w: any) => w.workout_date)).size / weeks) * 10) / 10,
             muscle_groups: sorted,
           }, null, 2),
         }],
@@ -884,12 +886,13 @@ function registerTools(server: McpServer, userId: string, isTrainer: boolean) {
           }
         }
 
+        const uniqueWkDates = new Set(wks.map((w: any) => w.workout_date)).size;
         comparisons.push({
           id: sid,
           name: student.name,
           username: student.username,
-          total_workouts: wks.length,
-          avg_workouts_per_week: Math.round((wks.length / weeks) * 10) / 10,
+          total_workouts: uniqueWkDates,
+          avg_workouts_per_week: Math.round((uniqueWkDates / weeks) * 10) / 10,
           total_volume_kg: Math.round(totalVol),
           total_sets: totalSets,
           consistency_pct: Math.round((uniqueWeeks.size / totalWeeks) * 100),
