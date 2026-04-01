@@ -6,7 +6,11 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix global styles not loading in production\n\nImport global.css in Layout.astro to ensure styles are included in the production build bundle.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(npm run build:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(curl -s http://localhost:3000/mcp -X POST -H \"Content-Type: application/json\" -H \"Authorization: Bearer gym_adb48a31eb9be47d69471fcfda66dbeeab12f8d757dd0d6c\" -d '{\"\"jsonrpc\"\":\"\"2.0\"\",\"\"method\"\":\"\"initialize\"\",\"\"params\"\":{\"\"protocolVersion\"\":\"\"2025-03-26\"\",\"\"capabilities\"\":{},\"\"clientInfo\"\":{\"\"name\"\":\"\"test\"\",\"\"version\"\":\"\"1.0\"\"}},\"\"id\"\":1}')"
     ]
   }
 }
