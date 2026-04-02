@@ -907,6 +907,85 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       opacity: 1;
     }
 
+    /* Quick Search */
+    .quick-search {
+      position: relative;
+      margin-bottom: var(--space-4);
+    }
+
+    .quick-search-input {
+      width: 100%;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 8px;
+      padding: var(--space-3) var(--space-4);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+    }
+
+    .quick-search-input:focus {
+      outline: none;
+      border-color: var(--text-muted);
+    }
+
+    .quick-search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .quick-search-results {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+      z-index: 50;
+    }
+
+    .quick-search-results.open {
+      display: block;
+    }
+
+    .qs-item {
+      padding: var(--space-3) var(--space-4);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition-fast);
+    }
+
+    .qs-item:last-child { border-bottom: none; }
+
+    .qs-item:hover, .qs-item:active {
+      background: var(--bg-tertiary);
+    }
+
+    .qs-name {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+    }
+
+    .qs-muscle {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .qs-empty {
+      padding: var(--space-4);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
     /* Ajustes para pantallas muy pequeñas */
     @media (max-width: 380px) {
       .page-title {
@@ -984,6 +1063,11 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
             <input type="date" id="workoutDate" class="date-input" />
           </div>
         </div>
+      </div>
+
+      <div class="quick-search">
+        <input type="text" class="quick-search-input" id="quickSearch" placeholder="Buscar ejercicio para agregar...">
+        <div class="quick-search-results" id="quickSearchResults"></div>
       </div>
 
       <div id="draftBanner" class="draft-banner" style="display:none;">
@@ -1201,6 +1285,55 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
         );
         group.style.display = hasVisible ? 'block' : 'none';
       });
+    });
+
+    // Quick Search (inline en workout area)
+    const quickSearch = document.getElementById('quickSearch');
+    const quickSearchResults = document.getElementById('quickSearchResults');
+
+    function addExerciseFromSearch(exerciseId, exerciseName, exerciseMuscle) {
+      workoutExercises.push({
+        id: exerciseId,
+        name: exerciseName,
+        muscle: exerciseMuscle,
+        equipment: '',
+        grip: '',
+        position: '',
+        sets: [{ weight: '', reps: '' }]
+      });
+      renderWorkout();
+      updateSaveButton();
+      quickSearch.value = '';
+      quickSearchResults.classList.remove('open');
+    }
+
+    quickSearch.addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (q.length < 2) { quickSearchResults.classList.remove('open'); return; }
+      const matches = exercises.filter(ex => ex.name.toLowerCase().includes(q) || ex.muscle_group.toLowerCase().includes(q));
+      if (matches.length === 0) {
+        quickSearchResults.innerHTML = '<div class="qs-empty">Sin resultados</div>';
+      } else {
+        quickSearchResults.innerHTML = matches.slice(0, 8).map(ex =>
+          `<div class="qs-item" data-id="${ex.id}" data-name="${ex.name}" data-muscle="${ex.muscle_group}">
+            <span class="qs-name">${ex.name}</span>
+            <span class="qs-muscle">${ex.muscle_group}</span>
+          </div>`
+        ).join('');
+      }
+      quickSearchResults.classList.add('open');
+
+      quickSearchResults.querySelectorAll('.qs-item').forEach(item => {
+        item.addEventListener('click', () => {
+          addExerciseFromSearch(item.dataset.id, item.dataset.name, item.dataset.muscle);
+        });
+      });
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.quick-search')) {
+        quickSearchResults.classList.remove('open');
+      }
     });
 
     // Mobile toggle
