@@ -685,6 +685,71 @@ const workoutExercisesData = Array.from(exercisesMap.values());
         display: block;
       }
     }
+
+    /* Draft banner y autosave indicator */
+    .draft-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--accent-orange);
+      border-radius: 8px;
+      padding: var(--space-3) var(--space-5);
+      margin-bottom: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    .draft-banner-text {
+      font-size: var(--text-sm);
+      color: var(--accent-orange);
+      font-family: 'Space Grotesk', monospace;
+    }
+
+    .draft-banner-actions {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .draft-btn {
+      font-family: 'Space Grotesk', monospace;
+      font-size: var(--text-xs);
+      padding: var(--space-2) var(--space-3);
+      border-radius: 6px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: opacity var(--transition-fast);
+    }
+
+    .draft-btn:hover { opacity: 0.8; }
+
+    .draft-btn-restore {
+      background: var(--accent-green-soft);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
+
+    .draft-btn-discard {
+      background: var(--accent-red-soft);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .autosave-indicator {
+      font-size: var(--text-xs);
+      color: var(--accent-green);
+      font-family: 'Space Grotesk', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0;
+      transition: opacity var(--transition-slow);
+      white-space: nowrap;
+    }
+
+    .autosave-indicator.visible {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -694,6 +759,7 @@ const workoutExercisesData = Array.from(exercisesMap.values());
       <span class="page-title">EDITAR ENTRENAMIENTO</span>
     </div>
     <div class="header-actions">
+      <span id="autoSaveIndicator" class="autosave-indicator">● Borrador guardado</span>
       <button class="btn-save" id="saveBtn">Guardar Cambios</button>
     </div>
   </header>
@@ -728,6 +794,14 @@ const workoutExercisesData = Array.from(exercisesMap.values());
             <label for="workoutDate">Fecha:</label>
             <input type="date" id="workoutDate" class="date-input" value={workout.workout_date} />
           </div>
+        </div>
+      </div>
+
+      <div id="draftBanner" class="draft-banner" style="display:none;">
+        <span class="draft-banner-text">● Tienes cambios sin guardar de la sesión anterior. ¿Restaurarlos?</span>
+        <div class="draft-banner-actions">
+          <button id="draftRestoreBtn" class="draft-btn draft-btn-restore">Restaurar</button>
+          <button id="draftDiscardBtn" class="draft-btn draft-btn-discard">Descartar</button>
         </div>
       </div>
 
@@ -851,6 +925,69 @@ const workoutExercisesData = Array.from(exercisesMap.values());
 
     // Cargar favoritos al inicio
     loadFavorites();
+
+    // === AUTO-SAVE (DRAFT) ===
+    const DRAFT_KEY = `gym_draft_edit_${workoutId}`;
+
+    let _draftInitDone = false;
+
+    function saveDraft() {
+      if (!_draftInitDone) return;
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        exercises: workoutExercises,
+        date: dateEl.value
+      }));
+      showAutoSaveIndicator();
+    }
+
+    function clearDraft() {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+
+    let _autoSaveTimer;
+    function showAutoSaveIndicator() {
+      const el = document.getElementById('autoSaveIndicator');
+      if (!el) return;
+      el.classList.add('visible');
+      clearTimeout(_autoSaveTimer);
+      _autoSaveTimer = setTimeout(() => el.classList.remove('visible'), 2000);
+    }
+
+    let _draftSaveTimer;
+    function saveDraftDebounced() {
+      clearTimeout(_draftSaveTimer);
+      _draftSaveTimer = setTimeout(saveDraft, 600);
+    }
+
+    function loadAndRestoreDraft() {
+      try {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (!saved) return;
+        const draft = JSON.parse(saved);
+        if (!draft?.exercises?.length) { clearDraft(); return; }
+        const banner = document.getElementById('draftBanner');
+        if (!banner) return;
+        banner.style.display = 'flex';
+        document.getElementById('draftRestoreBtn').addEventListener('click', () => {
+          workoutExercises = draft.exercises;
+          if (draft.date) dateEl.value = draft.date;
+          renderWorkout();
+          banner.style.display = 'none';
+        });
+        document.getElementById('draftDiscardBtn').addEventListener('click', () => {
+          clearDraft();
+          banner.style.display = 'none';
+        });
+      } catch {
+        clearDraft();
+      }
+    }
+
+    // Guardar borrador al cambiar la fecha
+    dateEl.addEventListener('change', saveDraft);
+
+    // Restaurar borrador si existe (debe ir después de renderWorkout inicial)
+    // === FIN AUTO-SAVE ===
 
     // Change exercise modal
     let currentChangeIndex = -1;
@@ -1067,6 +1204,7 @@ const workoutExercisesData = Array.from(exercisesMap.values());
           const setIndex = parseInt(e.target.dataset.set);
           const field = e.target.dataset.field;
           workoutExercises[exIndex].sets[setIndex][field] = e.target.value;
+          saveDraftDebounced();
         });
       });
 
@@ -1137,10 +1275,15 @@ const workoutExercisesData = Array.from(exercisesMap.values());
           }
         });
       });
+
+      saveDraft();
     }
 
     // Renderizar al cargar
     renderWorkout();
+    // Habilitar auto-save y mostrar banner si hay borrador
+    _draftInitDone = true;
+    loadAndRestoreDraft();
 
     // Guardar cambios
     saveBtn.addEventListener('click', async () => {
@@ -1183,6 +1326,7 @@ const workoutExercisesData = Array.from(exercisesMap.values());
         });
 
         if (response.ok) {
+          clearDraft();
           window.location.href = '/history';
         } else {
           const data = await response.json();

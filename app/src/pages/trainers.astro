@@ -538,12 +538,15 @@ const pendingTrainerCount = user.is_trainer
       <span class="logo-dot"></span>
     </a>
     <div class="header-actions">
-      <a href="/favorites" class="header-btn">Favoritos</a>
-      <a href="/history" class="header-btn">Historial</a>
-      <a href="/trainers" class="header-btn active">Entrenadores</a>
-      {user?.role === 'admin' && (
-        <a href="/admin/users" class="header-btn">Usuarios</a>
-      )}
+      <div class="nav-links" id="navLinks">
+        <a href="/favorites" class="header-btn">Favoritos</a>
+        <a href="/history" class="header-btn">Historial</a>
+        <a href="/trainers" class="header-btn active">Entrenadores</a>
+        {user?.role === 'admin' && (
+          <a href="/admin/users" class="header-btn">Usuarios</a>
+        )}
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menú">&#9776;</button>
       <div class="user-menu" id="userMenu">
         <button class="user-menu-btn" id="userMenuBtn">
           {user?.name}
@@ -653,12 +656,19 @@ const pendingTrainerCount = user.is_trainer
   </div>
 
   <script>
+    // Mobile nav toggle
+    document.getElementById('navToggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('navLinks')?.classList.toggle('open');
+    });
+
     // User menu
     const userMenu = document.getElementById('userMenu')!;
     const userMenuBtn = document.getElementById('userMenuBtn')!;
     userMenuBtn.addEventListener('click', () => userMenu.classList.toggle('open'));
     document.addEventListener('click', (e) => {
       if (!userMenu.contains(e.target as Node)) userMenu.classList.remove('open');
+      document.getElementById('navLinks')?.classList.remove('open');
     });
 
     // Logout

@@ -593,9 +593,12 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
       <span class="page-title">HISTORIAL</span>
     </div>
     <div class="header-actions">
-      <a href="/favorites" class="header-btn">Favoritos</a>
-      <a href="/trainers" class="header-btn">Entrenadores</a>
-      <a href="/workout/new" class="header-btn">Nuevo</a>
+      <div class="nav-links" id="navLinks">
+        <a href="/favorites" class="header-btn">Favoritos</a>
+        <a href="/trainers" class="header-btn">Entrenadores</a>
+        <a href="/workout/new" class="header-btn">Nuevo</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menú">&#9776;</button>
     </div>
   </header>
 
@@ -677,6 +680,13 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
   </main>
 
   <script>
+    // Mobile nav toggle
+    document.getElementById('navToggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('navLinks')?.classList.toggle('open');
+    });
+    document.addEventListener('click', () => document.getElementById('navLinks')?.classList.remove('open'));
+
     // Toggle de día
     document.querySelectorAll('.day-header').forEach(header => {
       header.addEventListener('click', (e) => {

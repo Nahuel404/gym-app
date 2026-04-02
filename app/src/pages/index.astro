@@ -1548,12 +1548,15 @@ const pendingTrainerCount = user?.is_trainer
       <span class="logo-dot"></span>
     </div>
     <div class="header-actions">
-      <a href="/favorites" class="header-btn">Favoritos</a>
-      <a href="/history" class="header-btn">Historial</a>
-      <a href="/trainers" class="header-btn">Entrenadores</a>
-      {user?.role === 'admin' && (
-        <a href="/admin/users" class="header-btn">Usuarios</a>
-      )}
+      <div class="nav-links" id="navLinks">
+        <a href="/favorites" class="header-btn">Favoritos</a>
+        <a href="/history" class="header-btn">Historial</a>
+        <a href="/trainers" class="header-btn">Entrenadores</a>
+        {user?.role === 'admin' && (
+          <a href="/admin/users" class="header-btn">Usuarios</a>
+        )}
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menú">&#9776;</button>
       <div class="user-menu" id="userMenu">
         <button class="user-menu-btn" id="userMenuBtn">
           {user?.name}
@@ -1862,6 +1865,13 @@ const pendingTrainerCount = user?.is_trainer
   </div>
 
   <script define:vars={{ periodType, periodValue, dateFrom, dateTo, exerciseLastWorkoutsData }}>
+    // Mobile nav toggle
+    document.getElementById('navToggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('navLinks')?.classList.toggle('open');
+    });
+    document.addEventListener('click', () => document.getElementById('navLinks')?.classList.remove('open'));
+
     // Elementos del DOM
     const modal = document.getElementById('periodModal');
     const btnOpen = document.getElementById('btnOpenPeriodModal');
