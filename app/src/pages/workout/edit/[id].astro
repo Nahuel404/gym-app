@@ -104,7 +104,7 @@ const workoutExercisesData = Array.from(exercisesMap.values());
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
-      padding: var(--space-4) var(--space-6);
+      padding: var(--space-3) var(--space-4);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -113,10 +113,22 @@ const workoutExercisesData = Array.from(exercisesMap.values());
       z-index: 100;
     }
 
+    @media (min-width: 768px) {
+      .app-header {
+        padding: var(--space-4) var(--space-6);
+      }
+    }
+
     .header-left {
       display: flex;
       align-items: center;
-      gap: var(--space-4);
+      gap: var(--space-3);
+    }
+
+    @media (max-width: 767px) {
+      .page-title {
+        display: none;
+      }
     }
 
     .back-btn {
