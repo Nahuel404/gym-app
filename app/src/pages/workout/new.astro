@@ -1708,7 +1708,13 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
           button.classList.add('loading');
 
           try {
-            const res = await fetch(`/api/exercise-history?exercise_id=${exerciseId}`);
+            const exIndex = parseInt(button.dataset.index);
+            const exercise = workoutExercises[exIndex];
+            const params = new URLSearchParams({ exercise_id: exerciseId });
+            if (exercise.equipment) params.set('equipment', exercise.equipment);
+            if (exercise.grip) params.set('grip', exercise.grip);
+            if (exercise.position) params.set('position', exercise.position);
+            const res = await fetch(`/api/exercise-history?${params}`);
             const data = await res.json();
 
             const popup = document.createElement('div');

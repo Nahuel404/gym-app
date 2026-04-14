@@ -19,12 +19,34 @@ export const GET: APIRoute = async ({ url, locals }) => {
       });
     }
 
-    // Get the most recent workout that includes this exercise
-    const { data, error } = await supabase
+    const equipment = url.searchParams.get('equipment') || '';
+    const grip = url.searchParams.get('grip') || '';
+    const position = url.searchParams.get('position') || '';
+
+    // Get the most recent workout that includes this exercise with matching variants
+    let query = supabase
       .from('exercise_history')
       .select('sets, weight, reps, date, variant_equipment, variant_grip, variant_position')
       .eq('user_id', user.id)
-      .eq('exercise_id', exerciseId)
+      .eq('exercise_id', exerciseId);
+
+    if (equipment) {
+      query = query.eq('variant_equipment', equipment);
+    } else {
+      query = query.is('variant_equipment', null);
+    }
+    if (grip) {
+      query = query.eq('variant_grip', grip);
+    } else {
+      query = query.is('variant_grip', null);
+    }
+    if (position) {
+      query = query.eq('variant_position', position);
+    } else {
+      query = query.is('variant_position', null);
+    }
+
+    const { data, error } = await query
       .order('date', { ascending: false })
       .order('sets', { ascending: true })
       .limit(20);
