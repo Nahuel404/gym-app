@@ -1,5 +1,6 @@
 ---
 import '../../styles/global.css';
+import PwaHead from '../../components/PwaHead.astro';
 import { supabase } from '../../lib/supabase';
 import { formatFullDate } from '../../lib/dates';
 
@@ -109,6 +110,7 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de {studentData.name} - GymApp</title>
+  <PwaHead />
   <style>
     .app-header {
       background: var(--bg-secondary);

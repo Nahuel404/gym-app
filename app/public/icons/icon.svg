@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#0a0a0a"/>
+  <!-- Barbell icon -->
+  <rect x="100" y="206" width="60" height="100" rx="8" fill="#ffffff"/>
+  <rect x="352" y="206" width="60" height="100" rx="8" fill="#ffffff"/>
+  <rect x="70" y="226" width="40" height="60" rx="6" fill="#a0a0a0"/>
+  <rect x="402" y="226" width="40" height="60" rx="6" fill="#a0a0a0"/>
+  <rect x="160" y="246" width="192" height="20" rx="4" fill="#ffffff"/>
+  <!-- G letter accent -->
+  <text x="256" y="400" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="80" fill="#30d158">G</text>
+</svg>

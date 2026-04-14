@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import PwaHead from '../components/PwaHead.astro';
 import LineChart from '../components/charts/LineChart.astro';
 import BarChart from '../components/charts/BarChart.astro';
 import ProgressRing from '../components/charts/ProgressRing.astro';
@@ -411,6 +412,7 @@ const pendingTrainerCount = user?.is_trainer
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - GymApp</title>
+  <PwaHead />
   <style>
     .app-header {
       background: var(--bg-secondary);

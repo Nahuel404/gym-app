@@ -1,5 +1,6 @@
 ---
 import '../../styles/global.css';
+import PwaHead from '../../components/PwaHead.astro';
 import { supabase } from '../../lib/supabase';
 
 interface Exercise {
@@ -43,6 +44,7 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nuevo Entrenamiento - GymApp</title>
+  <PwaHead />
   <style is:global>
     .app-header {
       background: var(--bg-secondary);

@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import PwaHead from '../components/PwaHead.astro';
 import { supabase } from '../lib/supabase';
 
 const user = Astro.locals.user;
@@ -90,6 +91,7 @@ function lastWorkoutAgo(dateStr: string | null): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mis Alumnos - GymApp</title>
+  <PwaHead />
   <style>
     .app-header {
       background: var(--bg-secondary);
