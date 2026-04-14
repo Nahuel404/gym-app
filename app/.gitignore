@@ -25,3 +25,9 @@ pnpm-debug.log*
 
 # Local Netlify folder
 .netlify
+
+# Local pacjage-lock.json
+package-lock.json
+
+# Local gitignore file
+.gitignore

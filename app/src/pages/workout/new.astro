@@ -395,6 +395,7 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       display: flex;
       gap: var(--space-2);
       align-items: center;
+      position: relative;
     }
 
     .btn-favorite {
@@ -417,6 +418,109 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       background: rgba(255, 159, 10, 0.15);
       border-color: var(--accent-orange);
       color: var(--accent-orange);
+    }
+
+    .btn-last-workout {
+      padding: var(--space-1) var(--space-2);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-last-workout:hover {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .btn-last-workout.loading {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .last-workout-popup {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: var(--space-2);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: var(--space-4);
+      z-index: 100;
+      min-width: 220px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .last-workout-popup .popup-title {
+      font-family: 'Space Grotesk', monospace;
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-3);
+    }
+
+    .last-workout-popup .popup-date {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+
+    .last-workout-popup .popup-sets {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .last-workout-popup .popup-set-row {
+      display: grid;
+      grid-template-columns: 30px 1fr 1fr;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+      align-items: center;
+    }
+
+    .last-workout-popup .popup-set-row .set-num {
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+    }
+
+    .last-workout-popup .popup-set-header {
+      display: grid;
+      grid-template-columns: 30px 1fr 1fr;
+      gap: var(--space-2);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-1);
+    }
+
+    .last-workout-popup .popup-empty {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+    }
+
+    .last-workout-popup .popup-close {
+      position: absolute;
+      top: var(--space-2);
+      right: var(--space-2);
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: var(--space-1);
+      line-height: 1;
+    }
+
+    .last-workout-popup .popup-close:hover {
+      color: var(--text-primary);
     }
 
     .btn-remove {
@@ -716,7 +820,8 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       }
 
       .btn-favorite,
-      .btn-remove {
+      .btn-remove,
+      .btn-last-workout {
         padding: var(--space-2);
         font-size: 0.7rem;
         min-height: 36px;
@@ -1429,6 +1534,9 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
               <div class="exercise-muscle">${exercise.muscle}</div>
             </div>
             <div class="exercise-header-buttons">
+              <button type="button" class="btn-last-workout" data-index="${exIndex}" data-exercise-id="${exercise.id}" title="Ver último entrenamiento">
+                ↩
+              </button>
               <button type="button" class="btn-favorite ${exercise.isFavorite ? 'favorited' : ''}" data-index="${exIndex}">
                 ${exercise.isFavorite ? '★' : '☆'}
               </button>
@@ -1577,6 +1685,81 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
             if (success) {
               renderWorkout();
             }
+          }
+        });
+      });
+
+      // Event listeners para ver último entrenamiento
+      document.querySelectorAll('.btn-last-workout').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const button = e.currentTarget;
+          const exerciseId = button.dataset.exerciseId;
+          const parent = button.closest('.exercise-header-buttons');
+
+          // Close any existing popup
+          const existing = document.querySelector('.last-workout-popup');
+          if (existing) {
+            existing.remove();
+            if (existing.parentElement === parent) return;
+          }
+
+          button.classList.add('loading');
+
+          try {
+            const res = await fetch(`/api/exercise-history?exercise_id=${exerciseId}`);
+            const data = await res.json();
+
+            const popup = document.createElement('div');
+            popup.className = 'last-workout-popup';
+
+            if (!data) {
+              popup.innerHTML = `
+                <button class="popup-close" type="button">×</button>
+                <div class="popup-title">Último entrenamiento</div>
+                <div class="popup-empty">Sin registros previos</div>
+              `;
+            } else {
+              const dateStr = new Date(data.date + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+              popup.innerHTML = `
+                <button class="popup-close" type="button">×</button>
+                <div class="popup-title">Último entrenamiento</div>
+                <div class="popup-date">${dateStr}</div>
+                <div class="popup-set-header">
+                  <span>#</span>
+                  <span>Peso</span>
+                  <span>Reps</span>
+                </div>
+                <div class="popup-sets">
+                  ${data.sets.map(s => `
+                    <div class="popup-set-row">
+                      <span class="set-num">${s.set}</span>
+                      <span>${s.weight} kg</span>
+                      <span>${s.reps}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              `;
+            }
+
+            parent.appendChild(popup);
+
+            popup.querySelector('.popup-close').addEventListener('click', () => popup.remove());
+
+            // Close on click outside
+            const closeOnOutside = (evt) => {
+              if (!popup.contains(evt.target) && evt.target !== button) {
+                popup.remove();
+                document.removeEventListener('click', closeOnOutside);
+              }
+            };
+            setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+
+          } catch (err) {
+            console.error('Error fetching last workout:', err);
+          } finally {
+            button.classList.remove('loading');
           }
         });
       });
