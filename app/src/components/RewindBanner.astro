@@ -191,175 +191,188 @@ const { weekStats, userName } = Astro.props;
 
     const W = 1080, H = 1920;
     const canvas = document.createElement('canvas');
-    canvas.width  = W;
-    canvas.height = H;
+    canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
 
-    // helpers
-    function sep(y, color) {
-      ctx.strokeStyle = color || '#222222';
+    // ── helpers ──────────────────────────────────────────────────
+    function hline(y, color, x0, x1) {
+      ctx.strokeStyle = color || '#242424';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(100, y); ctx.lineTo(W - 100, y);
+      ctx.moveTo(x0 ?? 100, y);
+      ctx.lineTo(x1 ?? W - 100, y);
       ctx.stroke();
     }
 
-    function pill(label, y, fgColor, bgColor, borderColor, fontSize) {
-      ctx.font = 'bold ' + (fontSize || 52) + 'px Orbitron, monospace';
+    function vline(x, y0, y1) {
+      ctx.strokeStyle = '#1e1e1e';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y0); ctx.lineTo(x, y1);
+      ctx.stroke();
+    }
+
+    function drawPill(label, cx, cy, fgColor, bgColor, borderColor, font) {
+      ctx.font = font || 'bold 46px Orbitron, monospace';
       const tw = ctx.measureText(label).width;
-      const pH = 84, pW = tw + 72, pX = (W - pW) / 2, pR = 12;
+      const pH = 80, pW = tw + 64, pX = cx - pW/2, pR = 10;
       ctx.fillStyle = bgColor;
       ctx.beginPath();
-      ctx.moveTo(pX + pR, y);
-      ctx.lineTo(pX + pW - pR, y);
-      ctx.arcTo(pX + pW, y, pX + pW, y + pR, pR);
-      ctx.lineTo(pX + pW, y + pH - pR);
-      ctx.arcTo(pX + pW, y + pH, pX + pW - pR, y + pH, pR);
-      ctx.lineTo(pX + pR, y + pH);
-      ctx.arcTo(pX, y + pH, pX, y + pH - pR, pR);
-      ctx.lineTo(pX, y + pR);
-      ctx.arcTo(pX, y, pX + pR, y, pR);
-      ctx.closePath();
+      ctx.roundRect(pX, cy - pH/2, pW, pH, pR);
       ctx.fill();
       ctx.strokeStyle = borderColor;
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.fillStyle = fgColor;
-      ctx.fillText(label, W / 2, y + 59);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, cx, cy);
+      ctx.textBaseline = 'alphabetic';
     }
 
-    function statBlock(value, label, x, yVal, yLbl) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 84px Orbitron, monospace';
-      ctx.fillText(value, x, yVal);
-      ctx.fillStyle = '#505050';
-      ctx.font = '21px "Space Grotesk", monospace';
-      ctx.fillText(label, x, yLbl);
-    }
-
-    function vDivider(x, yTop, yBot) {
-      ctx.strokeStyle = '#1e1e1e';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, yTop); ctx.lineTo(x, yBot);
-      ctx.stroke();
-    }
-
-    // ── BACKGROUND ──────────────────────────────────────────────
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, W, H);
-
-    // ── DOT GRID ────────────────────────────────────────────────
-    ctx.fillStyle = '#191919';
-    for (let x = 54; x < W; x += 54)
-      for (let y = 54; y < H; y += 54) {
-        ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
-      }
-
-    // ── CORNER BRACKETS ─────────────────────────────────────────
     function bracket(ox, oy, fx, fy) {
-      const s = 64, p = 52, sx = fx ? -1 : 1, sy = fy ? -1 : 1;
+      const s = 72, p = 56, sx = fx ? -1 : 1, sy = fy ? -1 : 1;
       ctx.save(); ctx.translate(ox, oy);
       ctx.strokeStyle = '#30d158'; ctx.lineWidth = 3; ctx.lineCap = 'square';
       ctx.beginPath();
       ctx.moveTo(sx*(p+s), sy*p); ctx.lineTo(sx*p, sy*p); ctx.lineTo(sx*p, sy*(p+s));
       ctx.stroke(); ctx.restore();
     }
+
+    // ── BACKGROUND ───────────────────────────────────────────────
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+
+    // dot grid
+    ctx.fillStyle = '#161616';
+    for (let x = 54; x < W; x += 54)
+      for (let y = 54; y < H; y += 54) {
+        ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+
+    // ── CORNER BRACKETS ─────────────────────────────────────────
     bracket(0,0,false,false); bracket(W,0,true,false);
     bracket(0,H,false,true);  bracket(W,H,true,true);
 
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
 
-    // ── LOGO ────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════
+    //  ZONE 1 — HEADER  (0 – 450)
+    // ═══════════════════════════════════════════════════════
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 56px Orbitron, monospace';
-    ctx.fillText('GYMAPP', W/2, 272);
+    ctx.font = 'bold 54px Orbitron, monospace';
+    ctx.fillText('GYMAPP', W/2, 244);
+
+    // accent dot after logo
     ctx.fillStyle = '#30d158';
-    ctx.beginPath(); ctx.arc(W/2+181, 255, 8, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(W/2 + 175, 228, 8, 0, Math.PI * 2); ctx.fill();
 
-    ctx.fillStyle = '#505050';
-    ctx.font = '24px "Space Grotesk", monospace';
-    ctx.fillText('REWIND SEMANAL', W/2, 334);
+    ctx.fillStyle = '#484848';
+    ctx.font = '23px "Space Grotesk", monospace';
+    ctx.fillText('REWIND SEMANAL', W/2, 310);
 
-    ctx.fillStyle = '#333333';
-    ctx.font = '21px "Space Grotesk", monospace';
-    ctx.fillText(weekStats.weekLabel, W/2, 376);
+    ctx.fillStyle = '#2e2e2e';
+    ctx.font = '20px "Space Grotesk", monospace';
+    ctx.fillText(weekStats.weekLabel, W/2, 354);
 
-    sep(428, '#30d158');
+    hline(410, '#30d158');
 
-    // ── HERO: DAYS ───────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════
+    //  ZONE 2 — HERO DAYS  (410 – 880)
+    // ═══════════════════════════════════════════════════════
+
+    // radial glow behind the number (Spotify-inspired)
+    const glow = ctx.createRadialGradient(W/2, 680, 0, W/2, 680, 380);
+    glow.addColorStop(0, 'rgba(48,209,88,0.10)');
+    glow.addColorStop(1, 'rgba(48,209,88,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 420, W, 500);
+
     ctx.fillStyle = '#30d158';
-    ctx.font = 'bold 230px Orbitron, monospace';
-    ctx.fillText(weekStats.days.toString(), W/2, 730);
+    ctx.font = 'bold 256px Orbitron, monospace';
+    ctx.fillText(weekStats.days.toString(), W/2, 800);
 
-    ctx.fillStyle = '#777777';
-    ctx.font = 'bold 28px Orbitron, monospace';
-    ctx.fillText('DÍAS ENTRENADOS', W/2, 794);
+    ctx.fillStyle = '#606060';
+    ctx.font = 'bold 26px Orbitron, monospace';
+    ctx.fillText('DÍAS ENTRENADOS', W/2, 860);
 
-    sep(854);
+    hline(910);
 
-    // ── ROW 1: VOLUMEN | SERIES ─────────────────────────────────
-    statBlock(weekStats.volume+'t', 'VOLUMEN',   W/4,    990, 1040);
-    vDivider(W/2, 870, 1080);
-    statBlock(weekStats.sets+'',    'SERIES',    W*3/4,  990, 1040);
+    // ═══════════════════════════════════════════════════════
+    //  ZONE 3 — STATS 2×2  (910 – 1340)
+    // ═══════════════════════════════════════════════════════
 
-    sep(1098);
+    // Row A: VOLUMEN | SERIES
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 82px Orbitron, monospace';
+    ctx.fillText(weekStats.volume + 't', W/4, 1060);
+    ctx.font = 'bold 82px Orbitron, monospace';
+    ctx.fillText(weekStats.sets + '', W*3/4, 1060);
 
-    // ── ROW 2: RACHA | EJERCICIOS ───────────────────────────────
-    statBlock(weekStats.streak+'',          'RACHA',      W/4,   1214, 1264);
-    vDivider(W/2, 1116, 1282);
-    statBlock(weekStats.uniqueExercises+'', 'EJERCICIOS', W*3/4, 1214, 1264);
+    ctx.fillStyle = '#484848';
+    ctx.font = '20px "Space Grotesk", monospace';
+    ctx.fillText('VOLUMEN', W/4, 1108);
+    ctx.fillText('SERIES',  W*3/4, 1108);
 
-    sep(1308);
+    vline(W/2, 930, 1140);
+    hline(1160);
 
-    // ── TOP MUSCLE ──────────────────────────────────────────────
+    // Row B: RACHA | EJERCICIOS
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 82px Orbitron, monospace';
+    ctx.fillText(weekStats.streak + '', W/4, 1298);
+    ctx.fillText(weekStats.uniqueExercises + '', W*3/4, 1298);
+
+    ctx.fillStyle = '#484848';
+    ctx.font = '20px "Space Grotesk", monospace';
+    ctx.fillText('RACHA',       W/4, 1346);
+    ctx.fillText('EJERCICIOS',  W*3/4, 1346);
+
+    vline(W/2, 1178, 1370);
+    hline(1390);
+
+    // ═══════════════════════════════════════════════════════
+    //  ZONE 4 — MÚSCULO DESTACADO  (1390 – 1610)
+    // ═══════════════════════════════════════════════════════
+    ctx.fillStyle = '#3a3a3a';
+    ctx.font = '20px "Space Grotesk", monospace';
+    ctx.fillText('MÚSCULO DESTACADO', W/2, 1462);
+
     if (weekStats.topMuscle) {
-      ctx.fillStyle = '#454545';
-      ctx.font = '22px "Space Grotesk", monospace';
-      ctx.fillText('MÚSCULO DESTACADO', W/2, 1384);
-      pill(weekStats.topMuscle.toUpperCase(), 1406, '#ff9500', '#1a0d00', '#ff9500', 48);
+      drawPill(weekStats.topMuscle.toUpperCase(), W/2, 1540,
+        '#ff9500', '#180d00', '#ff9500', 'bold 48px Orbitron, monospace');
     }
 
-    const muscleBottom = weekStats.topMuscle ? 1510 : 1350;
-    sep(muscleBottom);
+    hline(1618);
 
-    // ── PRs THIS WEEK ───────────────────────────────────────────
-    let prBottom = muscleBottom + 10;
+    // ═══════════════════════════════════════════════════════
+    //  ZONE 5 — PRs  (1618 – 1740)
+    // ═══════════════════════════════════════════════════════
     if (weekStats.prs > 0) {
-      const prLabel = weekStats.prs === 1 ? '1 RÉCORD NUEVO' : weekStats.prs + ' RÉCORDS NUEVOS';
-      pill(prLabel, muscleBottom + 30, '#30d158', '#0a1f0f', '#30d158', 38);
-      prBottom = muscleBottom + 140;
+      const label = weekStats.prs === 1 ? '1 RÉCORD NUEVO' : weekStats.prs + ' RÉCORDS NUEVOS';
+      drawPill(label, W/2, 1686,
+        '#30d158', '#091a10', '#30d158', 'bold 38px Orbitron, monospace');
+    } else {
+      // sin PRs: mostrar semana total all-time como curiosidad
+      ctx.fillStyle = '#282828';
+      ctx.font = '20px "Space Grotesk", monospace';
+      ctx.fillText('Sin récords esta semana · ¡La próxima!', W/2, 1690);
     }
 
-    // ── BEST LIFT ───────────────────────────────────────────────
-    if (weekStats.bestLift && weekStats.bestLift.weight > 0) {
-      const bl = weekStats.bestLift;
-      ctx.fillStyle = '#383838';
-      ctx.font = '21px "Space Grotesk", monospace';
-      ctx.fillText('MEJOR SERIE', W/2, prBottom + 60);
-
-      ctx.fillStyle = '#888888';
-      ctx.font = '28px "Space Grotesk", monospace';
-      ctx.fillText(bl.name, W/2, prBottom + 104);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 44px Orbitron, monospace';
-      ctx.fillText(bl.weight + 'kg × ' + bl.reps, W/2, prBottom + 164);
-    }
-
-    // ── FOOTER ──────────────────────────────────────────────────
-    sep(H - 210, '#30d158');
+    // ═══════════════════════════════════════════════════════
+    //  ZONE 6 — FOOTER  (1740 – 1920)
+    // ═══════════════════════════════════════════════════════
+    hline(1768, '#30d158');
 
     if (userName) {
-      ctx.fillStyle = '#404040';
+      ctx.fillStyle = '#383838';
       ctx.font = '26px "Space Grotesk", monospace';
-      ctx.fillText(userName, W/2, H - 152);
+      ctx.fillText(userName, W/2, 1844);
     }
 
-    ctx.fillStyle = '#282828';
-    ctx.font = '21px "Space Grotesk", monospace';
-    ctx.fillText('Tu progreso, tu récord · GymApp', W/2, H - 112);
+    ctx.fillStyle = '#242424';
+    ctx.font = '20px "Space Grotesk", monospace';
+    ctx.fillText('Tu progreso, tu récord · GymApp', W/2, 1886);
 
     // ── DOWNLOAD ────────────────────────────────────────────────
     const dataUrl = canvas.toDataURL('image/jpeg', 0.93);
