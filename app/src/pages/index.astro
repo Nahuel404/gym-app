@@ -114,11 +114,13 @@ const weekUniqueExercises = new Set(
   weekHistory.map((h: any) => h.exercises?.id).filter(Boolean)
 ).size;
 
-// Mejor serie de la semana (mayor 1RM estimado)
-const weekBestSet = weekHistory.reduce((best: any, h: any) => {
-  const score = h.weight === 0 ? h.reps : h.weight * (1 + h.reps / 30);
-  return score > (best?.score ?? 0) ? { ...h, score } : best;
-}, null);
+// Mejor serie de la semana (mayor 1RM estimado, excluyendo músculos menores)
+const weekBestSet = weekHistory
+  .filter((h: any) => h.exercises && !EXCLUDED_MUSCLES.has(h.exercises.muscle_group) && h.weight > 0)
+  .reduce((best: any, h: any) => {
+    const score = h.weight * (1 + h.reps / 30);
+    return score > (best?.score ?? 0) ? { ...h, score } : best;
+  }, null);
 const weekBestLift = weekBestSet?.exercises ? {
   name: weekBestSet.exercises.name as string,
   weight: weekBestSet.weight as number,
