@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import RewindBanner from '../components/RewindBanner.astro';
 import LineChart from '../components/charts/LineChart.astro';
 import BarChart from '../components/charts/BarChart.astro';
 import ProgressRing from '../components/charts/ProgressRing.astro';
@@ -66,6 +67,42 @@ const totalVolume = historyData.reduce((acc, h) => acc + (h.weight * h.reps), 0)
 
 // Entrenamientos esta semana (días únicos)
 const thisWeek = uniqueDates.filter(d => parseLocalDate(d) >= oneWeekAgo).length;
+
+// Stats de la semana calendario (lunes - domingo) para el Rewind
+const mondayOfWeek = getMonday(now);
+const sundayOfWeek = new Date(mondayOfWeek);
+sundayOfWeek.setDate(mondayOfWeek.getDate() + 6);
+sundayOfWeek.setHours(23, 59, 59, 999);
+
+const weekWorkouts = workoutsData?.filter(w => {
+  const d = parseLocalDate(w.workout_date);
+  return d >= mondayOfWeek && d <= sundayOfWeek;
+}) || [];
+
+const weekDays = new Set(weekWorkouts.map(w => w.workout_date)).size;
+const weekHistory = weekWorkouts.flatMap(w => w.exercise_history || []);
+const weekVolume = weekHistory.reduce((acc: number, h: any) => acc + (h.weight * h.reps), 0);
+const weekSetCount = weekHistory.length;
+
+const weekMuscleVol = new Map<string, number>();
+weekHistory.forEach((h: any) => {
+  if (h.exercises) {
+    const m = h.exercises.muscle_group as string;
+    weekMuscleVol.set(m, (weekMuscleVol.get(m) || 0) + h.weight * h.reps);
+  }
+});
+const weekTopMuscle = [...weekMuscleVol.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+
+const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+const weekLabel = `${mondayOfWeek.getDate()} ${MONTHS[mondayOfWeek.getMonth()]} — ${sundayOfWeek.getDate()} ${MONTHS[sundayOfWeek.getMonth()]}`;
+
+const weekStats = {
+  days: weekDays,
+  volume: (weekVolume / 1000).toFixed(1),
+  sets: weekSetCount,
+  topMuscle: weekTopMuscle,
+  weekLabel,
+};
 
 // Calcular racha actual (días únicos, ordenados descendente)
 let currentStreak = 0;
@@ -1616,6 +1653,8 @@ const pendingTrainerCount = user?.is_trainer
             icon="time"
           />
         </div>
+
+        <RewindBanner weekStats={weekStats} userName={user?.name ?? ''} />
 
         <!-- Main Charts -->
         <div class="dashboard-grid">

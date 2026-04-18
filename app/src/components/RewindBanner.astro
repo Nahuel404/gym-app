@@ -1,0 +1,368 @@
+---
+interface Props {
+  weekStats: {
+    days: number;
+    volume: string;
+    sets: number;
+    topMuscle: string;
+    weekLabel: string;
+  };
+  userName: string;
+}
+const { weekStats, userName } = Astro.props;
+---
+
+<div id="rewind-banner" class="rewind-banner" aria-hidden="true">
+  <button class="rewind-dismiss" id="rewind-dismiss" aria-label="Cerrar">×</button>
+  <div class="rewind-inner">
+    <div class="rewind-icon">◆</div>
+    <div class="rewind-content">
+      <div class="rewind-heading">REWIND SEMANAL</div>
+      <div class="rewind-week">{weekStats.weekLabel}</div>
+      <div class="rewind-mini-stats">
+        <span><strong>{weekStats.days}</strong> días</span>
+        <span class="sep">·</span>
+        <span><strong>{weekStats.volume}t</strong> vol</span>
+        <span class="sep">·</span>
+        <span><strong>{weekStats.sets}</strong> series</span>
+      </div>
+    </div>
+    <button class="rewind-btn" id="rewind-generate">
+      <span class="rewind-shimmer-line"></span>
+      <span class="rewind-btn-text">COMPARTIR</span>
+    </button>
+  </div>
+</div>
+
+<style is:global>
+  .rewind-banner {
+    display: none;
+    position: relative;
+    margin: var(--space-4) 0;
+    padding: 1.5px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #30d158 0%, #ff9500 50%, #30d158 100%);
+    background-size: 200% 100%;
+    animation: rewind-border-slide 3s linear infinite;
+  }
+
+  @keyframes rewind-border-slide {
+    0%   { background-position: 0% 0%; }
+    100% { background-position: 200% 0%; }
+  }
+
+  .rewind-inner {
+    background: var(--bg-secondary);
+    border-radius: 9px;
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .rewind-dismiss {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 2px 6px;
+    cursor: pointer;
+    z-index: 1;
+    transition: color var(--transition-fast);
+  }
+  .rewind-dismiss:hover { color: var(--text-primary); }
+
+  .rewind-icon {
+    font-size: 1.4rem;
+    color: var(--accent-green);
+    flex-shrink: 0;
+    animation: rewind-icon-pulse 2s ease infinite;
+  }
+
+  @keyframes rewind-icon-pulse {
+    0%, 100% { opacity: 1;   transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .rewind-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .rewind-heading {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: var(--accent-green);
+    margin-bottom: 2px;
+  }
+
+  .rewind-week {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .rewind-mini-stats {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .rewind-mini-stats strong { color: var(--text-primary); }
+  .rewind-mini-stats .sep   { color: var(--border-light); }
+
+  .rewind-btn {
+    position: relative;
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    letter-spacing: 1.5px;
+    background: var(--accent-green);
+    color: var(--text-dark);
+    border: none;
+    border-radius: 6px;
+    padding: var(--space-2) var(--space-3);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity var(--transition-fast);
+  }
+  .rewind-btn:hover    { opacity: 0.88; }
+  .rewind-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .rewind-shimmer-line {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.35) 50%, transparent 60%);
+    background-size: 200% 100%;
+    animation: rewind-shimmer 2.2s ease infinite;
+  }
+  .rewind-btn:disabled .rewind-shimmer-line { display: none; }
+
+  @keyframes rewind-shimmer {
+    0%   { background-position: -100% 0; }
+    100% { background-position: 200% 0; }
+  }
+</style>
+
+<script define:vars={{ weekStats, userName }}>
+  const banner      = document.getElementById('rewind-banner');
+  const dismissBtn  = document.getElementById('rewind-dismiss');
+  const generateBtn = document.getElementById('rewind-generate');
+  const btnText     = generateBtn.querySelector('.rewind-btn-text');
+
+  // Show only on Saturdays (or ?rewind=1 for testing)
+  const isSaturday = new Date().getDay() === 6;
+  const isTest     = new URLSearchParams(location.search).has('rewind');
+  const dismissKey = 'rewind-dismissed-' + weekStats.weekLabel;
+
+  if ((isSaturday || isTest) && !localStorage.getItem(dismissKey)) {
+    banner.style.display = 'block';
+    banner.removeAttribute('aria-hidden');
+  }
+
+  dismissBtn.addEventListener('click', () => {
+    localStorage.setItem(dismissKey, '1');
+    banner.style.display = 'none';
+  });
+
+  generateBtn.addEventListener('click', async () => {
+    generateBtn.disabled = true;
+    btnText.textContent  = 'GENERANDO...';
+    try {
+      await generateRewindImage();
+    } finally {
+      generateBtn.disabled = false;
+      btnText.textContent  = 'COMPARTIR';
+    }
+  });
+
+  async function generateRewindImage() {
+    await document.fonts.ready;
+
+    const W = 1080, H = 1920;
+    const canvas = document.createElement('canvas');
+    canvas.width  = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    // ── BACKGROUND ──────────────────────────────────────────────
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+
+    // ── DOT GRID ────────────────────────────────────────────────
+    ctx.fillStyle = '#1c1c1c';
+    for (let x = 54; x < W; x += 54) {
+      for (let y = 54; y < H; y += 54) {
+        ctx.beginPath();
+        ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ── CORNER BRACKETS ─────────────────────────────────────────
+    function drawBracket(ox, oy, flipX, flipY) {
+      const s = 64, p = 52;
+      const sx = flipX ? -1 : 1, sy = flipY ? -1 : 1;
+      ctx.save();
+      ctx.translate(ox, oy);
+      ctx.strokeStyle = '#30d158';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'square';
+      ctx.beginPath();
+      ctx.moveTo(sx * (p + s), sy * p);
+      ctx.lineTo(sx * p, sy * p);
+      ctx.lineTo(sx * p, sy * (p + s));
+      ctx.stroke();
+      ctx.restore();
+    }
+    drawBracket(0,   0,   false, false);
+    drawBracket(W,   0,   true,  false);
+    drawBracket(0,   H,   false, true);
+    drawBracket(W,   H,   true,  true);
+
+    // ── LOGO ────────────────────────────────────────────────────
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 58px Orbitron, monospace';
+    ctx.fillText('GYMAPP', W / 2, 280);
+
+    // logo dot
+    ctx.fillStyle = '#30d158';
+    ctx.beginPath();
+    ctx.arc(W / 2 + 186, 262, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ── SUBTITLE ────────────────────────────────────────────────
+    ctx.fillStyle = '#555555';
+    ctx.font = '26px "Space Grotesk", monospace';
+    ctx.fillText('REWIND SEMANAL', W / 2, 348);
+
+    ctx.fillStyle = '#383838';
+    ctx.font = '22px "Space Grotesk", monospace';
+    ctx.fillText(weekStats.weekLabel, W / 2, 396);
+
+    // ── TOP SEPARATOR ───────────────────────────────────────────
+    ctx.strokeStyle = '#30d158';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(100, 450); ctx.lineTo(W - 100, 450);
+    ctx.stroke();
+
+    // ── MAIN STAT: DAYS ─────────────────────────────────────────
+    ctx.fillStyle = '#30d158';
+    ctx.font = 'bold 260px Orbitron, monospace';
+    ctx.fillText(weekStats.days.toString(), W / 2, 790);
+
+    ctx.fillStyle = '#888888';
+    ctx.font = 'bold 30px Orbitron, monospace';
+    ctx.fillText('DÍAS ENTRENADOS', W / 2, 858);
+
+    // ── MID SEPARATOR ───────────────────────────────────────────
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(100, 920); ctx.lineTo(W - 100, 920);
+    ctx.stroke();
+
+    // ── VOLUME (left) ───────────────────────────────────────────
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 100px Orbitron, monospace';
+    ctx.fillText(weekStats.volume + 't', W / 4, 1070);
+
+    ctx.fillStyle = '#555555';
+    ctx.font = '24px "Space Grotesk", monospace';
+    ctx.fillText('VOLUMEN', W / 4, 1120);
+
+    // vertical divider
+    ctx.strokeStyle = '#1e1e1e';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W / 2, 940); ctx.lineTo(W / 2, 1160);
+    ctx.stroke();
+
+    // ── SERIES (right) ──────────────────────────────────────────
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 100px Orbitron, monospace';
+    ctx.fillText(weekStats.sets.toString(), (W * 3) / 4, 1070);
+
+    ctx.fillStyle = '#555555';
+    ctx.font = '24px "Space Grotesk", monospace';
+    ctx.fillText('SERIES', (W * 3) / 4, 1120);
+
+    // ── LOWER SEPARATOR ─────────────────────────────────────────
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(100, 1200); ctx.lineTo(W - 100, 1200);
+    ctx.stroke();
+
+    // ── TOP MUSCLE ──────────────────────────────────────────────
+    if (weekStats.topMuscle) {
+      ctx.fillStyle = '#555555';
+      ctx.font = '24px "Space Grotesk", monospace';
+      ctx.fillText('MÚSCULO DESTACADO', W / 2, 1300);
+
+      const muscleLabel = weekStats.topMuscle.toUpperCase();
+      ctx.font = 'bold 60px Orbitron, monospace';
+      const tw = ctx.measureText(muscleLabel).width;
+      const pH = 96, pW = tw + 80, pX = (W - pW) / 2, pY = 1330, pR = 14;
+
+      // pill bg
+      ctx.fillStyle = '#1a0d00';
+      ctx.beginPath();
+      ctx.moveTo(pX + pR, pY);
+      ctx.lineTo(pX + pW - pR, pY);
+      ctx.arcTo(pX + pW, pY, pX + pW, pY + pR, pR);
+      ctx.lineTo(pX + pW, pY + pH - pR);
+      ctx.arcTo(pX + pW, pY + pH, pX + pW - pR, pY + pH, pR);
+      ctx.lineTo(pX + pR, pY + pH);
+      ctx.arcTo(pX, pY + pH, pX, pY + pH - pR, pR);
+      ctx.lineTo(pX, pY + pR);
+      ctx.arcTo(pX, pY, pX + pR, pY, pR);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#ff9500';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ff9500';
+      ctx.fillText(muscleLabel, W / 2, pY + 68);
+    }
+
+    // ── BOTTOM SEPARATOR ────────────────────────────────────────
+    ctx.strokeStyle = '#30d158';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(100, H - 200); ctx.lineTo(W - 100, H - 200);
+    ctx.stroke();
+
+    // ── USERNAME ────────────────────────────────────────────────
+    if (userName) {
+      ctx.fillStyle = '#404040';
+      ctx.font = '26px "Space Grotesk", monospace';
+      ctx.fillText(userName, W / 2, H - 148);
+    }
+
+    // ── BRANDING ────────────────────────────────────────────────
+    ctx.fillStyle = '#2a2a2a';
+    ctx.font = '22px "Space Grotesk", monospace';
+    ctx.fillText('Tu progreso, tu récord · GymApp', W / 2, H - 108);
+
+    // ── DOWNLOAD ────────────────────────────────────────────────
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.93);
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'gymapp-rewind-' + weekStats.weekLabel.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() + '.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+</script>
