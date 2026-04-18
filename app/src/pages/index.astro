@@ -20,6 +20,7 @@ const { data: workoutsData } = await supabase
       id,
       weight,
       reps,
+      is_pr,
       variant_equipment,
       variant_grip,
       variant_position,
@@ -84,14 +85,45 @@ const weekHistory = weekWorkouts.flatMap(w => w.exercise_history || []);
 const weekVolume = weekHistory.reduce((acc: number, h: any) => acc + (h.weight * h.reps), 0);
 const weekSetCount = weekHistory.length;
 
-const weekMuscleVol = new Map<string, number>();
+// Top muscle: por cantidad de series, excluyendo músculos menores, priorizando favoritos
+const EXCLUDED_MUSCLES = new Set(['Pantorrilla', 'Pantorrillas', 'Antebrazos']);
+
+const weekMuscleSets = new Map<string, number>();
 weekHistory.forEach((h: any) => {
   if (h.exercises) {
     const m = h.exercises.muscle_group as string;
-    weekMuscleVol.set(m, (weekMuscleVol.get(m) || 0) + h.weight * h.reps);
+    weekMuscleSets.set(m, (weekMuscleSets.get(m) || 0) + 1);
   }
 });
-const weekTopMuscle = [...weekMuscleVol.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+
+const validMuscleSets = [...weekMuscleSets.entries()]
+  .filter(([m]) => !EXCLUDED_MUSCLES.has(m))
+  .sort((a, b) => b[1] - a[1]);
+
+const favoriteMuscles = new Set(
+  favoritesData?.map((f: any) => f.exercises?.muscle_group).filter(Boolean) || []
+);
+const topFromFavorites = validMuscleSets.find(([m]) => favoriteMuscles.has(m));
+const weekTopMuscle = (topFromFavorites ?? validMuscleSets[0])?.[0] ?? '';
+
+// PRs esta semana
+const weekPRs = weekHistory.filter((h: any) => h.is_pr).length;
+
+// Ejercicios únicos esta semana
+const weekUniqueExercises = new Set(
+  weekHistory.map((h: any) => h.exercises?.id).filter(Boolean)
+).size;
+
+// Mejor serie de la semana (mayor 1RM estimado)
+const weekBestSet = weekHistory.reduce((best: any, h: any) => {
+  const score = h.weight === 0 ? h.reps : h.weight * (1 + h.reps / 30);
+  return score > (best?.score ?? 0) ? { ...h, score } : best;
+}, null);
+const weekBestLift = weekBestSet?.exercises ? {
+  name: weekBestSet.exercises.name as string,
+  weight: weekBestSet.weight as number,
+  reps: weekBestSet.reps as number,
+} : null;
 
 const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 const weekLabel = `${mondayOfWeek.getDate()} ${MONTHS[mondayOfWeek.getMonth()]} — ${sundayOfWeek.getDate()} ${MONTHS[sundayOfWeek.getMonth()]}`;
@@ -101,6 +133,10 @@ const weekStats = {
   volume: (weekVolume / 1000).toFixed(1),
   sets: weekSetCount,
   topMuscle: weekTopMuscle,
+  prs: weekPRs,
+  uniqueExercises: weekUniqueExercises,
+  streak: currentStreak,
+  bestLift: weekBestLift,
   weekLabel,
 };
 

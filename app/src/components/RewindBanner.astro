@@ -5,6 +5,10 @@ interface Props {
     volume: string;
     sets: number;
     topMuscle: string;
+    prs: number;
+    uniqueExercises: number;
+    streak: number;
+    bestLift: { name: string; weight: number; reps: number } | null;
     weekLabel: string;
   };
   userName: string;
@@ -191,175 +195,176 @@ const { weekStats, userName } = Astro.props;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
 
+    // helpers
+    function sep(y, color) {
+      ctx.strokeStyle = color || '#222222';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(100, y); ctx.lineTo(W - 100, y);
+      ctx.stroke();
+    }
+
+    function pill(label, y, fgColor, bgColor, borderColor, fontSize) {
+      ctx.font = 'bold ' + (fontSize || 52) + 'px Orbitron, monospace';
+      const tw = ctx.measureText(label).width;
+      const pH = 84, pW = tw + 72, pX = (W - pW) / 2, pR = 12;
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.moveTo(pX + pR, y);
+      ctx.lineTo(pX + pW - pR, y);
+      ctx.arcTo(pX + pW, y, pX + pW, y + pR, pR);
+      ctx.lineTo(pX + pW, y + pH - pR);
+      ctx.arcTo(pX + pW, y + pH, pX + pW - pR, y + pH, pR);
+      ctx.lineTo(pX + pR, y + pH);
+      ctx.arcTo(pX, y + pH, pX, y + pH - pR, pR);
+      ctx.lineTo(pX, y + pR);
+      ctx.arcTo(pX, y, pX + pR, y, pR);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = fgColor;
+      ctx.fillText(label, W / 2, y + 59);
+    }
+
+    function statBlock(value, label, x, yVal, yLbl) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 84px Orbitron, monospace';
+      ctx.fillText(value, x, yVal);
+      ctx.fillStyle = '#505050';
+      ctx.font = '21px "Space Grotesk", monospace';
+      ctx.fillText(label, x, yLbl);
+    }
+
+    function vDivider(x, yTop, yBot) {
+      ctx.strokeStyle = '#1e1e1e';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, yTop); ctx.lineTo(x, yBot);
+      ctx.stroke();
+    }
+
     // ── BACKGROUND ──────────────────────────────────────────────
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, W, H);
 
     // ── DOT GRID ────────────────────────────────────────────────
-    ctx.fillStyle = '#1c1c1c';
-    for (let x = 54; x < W; x += 54) {
+    ctx.fillStyle = '#191919';
+    for (let x = 54; x < W; x += 54)
       for (let y = 54; y < H; y += 54) {
-        ctx.beginPath();
-        ctx.arc(x, y, 1.8, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
       }
-    }
 
     // ── CORNER BRACKETS ─────────────────────────────────────────
-    function drawBracket(ox, oy, flipX, flipY) {
-      const s = 64, p = 52;
-      const sx = flipX ? -1 : 1, sy = flipY ? -1 : 1;
-      ctx.save();
-      ctx.translate(ox, oy);
-      ctx.strokeStyle = '#30d158';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'square';
+    function bracket(ox, oy, fx, fy) {
+      const s = 64, p = 52, sx = fx ? -1 : 1, sy = fy ? -1 : 1;
+      ctx.save(); ctx.translate(ox, oy);
+      ctx.strokeStyle = '#30d158'; ctx.lineWidth = 3; ctx.lineCap = 'square';
       ctx.beginPath();
-      ctx.moveTo(sx * (p + s), sy * p);
-      ctx.lineTo(sx * p, sy * p);
-      ctx.lineTo(sx * p, sy * (p + s));
-      ctx.stroke();
-      ctx.restore();
+      ctx.moveTo(sx*(p+s), sy*p); ctx.lineTo(sx*p, sy*p); ctx.lineTo(sx*p, sy*(p+s));
+      ctx.stroke(); ctx.restore();
     }
-    drawBracket(0,   0,   false, false);
-    drawBracket(W,   0,   true,  false);
-    drawBracket(0,   H,   false, true);
-    drawBracket(W,   H,   true,  true);
+    bracket(0,0,false,false); bracket(W,0,true,false);
+    bracket(0,H,false,true);  bracket(W,H,true,true);
+
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'alphabetic';
 
     // ── LOGO ────────────────────────────────────────────────────
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 58px Orbitron, monospace';
-    ctx.fillText('GYMAPP', W / 2, 280);
-
-    // logo dot
+    ctx.font = 'bold 56px Orbitron, monospace';
+    ctx.fillText('GYMAPP', W/2, 272);
     ctx.fillStyle = '#30d158';
-    ctx.beginPath();
-    ctx.arc(W / 2 + 186, 262, 8, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(W/2+181, 255, 8, 0, Math.PI*2); ctx.fill();
 
-    // ── SUBTITLE ────────────────────────────────────────────────
-    ctx.fillStyle = '#555555';
-    ctx.font = '26px "Space Grotesk", monospace';
-    ctx.fillText('REWIND SEMANAL', W / 2, 348);
+    ctx.fillStyle = '#505050';
+    ctx.font = '24px "Space Grotesk", monospace';
+    ctx.fillText('REWIND SEMANAL', W/2, 334);
 
-    ctx.fillStyle = '#383838';
-    ctx.font = '22px "Space Grotesk", monospace';
-    ctx.fillText(weekStats.weekLabel, W / 2, 396);
+    ctx.fillStyle = '#333333';
+    ctx.font = '21px "Space Grotesk", monospace';
+    ctx.fillText(weekStats.weekLabel, W/2, 376);
 
-    // ── TOP SEPARATOR ───────────────────────────────────────────
-    ctx.strokeStyle = '#30d158';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(100, 450); ctx.lineTo(W - 100, 450);
-    ctx.stroke();
+    sep(428, '#30d158');
 
-    // ── MAIN STAT: DAYS ─────────────────────────────────────────
+    // ── HERO: DAYS ───────────────────────────────────────────────
     ctx.fillStyle = '#30d158';
-    ctx.font = 'bold 260px Orbitron, monospace';
-    ctx.fillText(weekStats.days.toString(), W / 2, 790);
+    ctx.font = 'bold 230px Orbitron, monospace';
+    ctx.fillText(weekStats.days.toString(), W/2, 730);
 
-    ctx.fillStyle = '#888888';
-    ctx.font = 'bold 30px Orbitron, monospace';
-    ctx.fillText('DÍAS ENTRENADOS', W / 2, 858);
+    ctx.fillStyle = '#777777';
+    ctx.font = 'bold 28px Orbitron, monospace';
+    ctx.fillText('DÍAS ENTRENADOS', W/2, 794);
 
-    // ── MID SEPARATOR ───────────────────────────────────────────
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(100, 920); ctx.lineTo(W - 100, 920);
-    ctx.stroke();
+    sep(854);
 
-    // ── VOLUME (left) ───────────────────────────────────────────
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 100px Orbitron, monospace';
-    ctx.fillText(weekStats.volume + 't', W / 4, 1070);
+    // ── ROW 1: VOLUMEN | SERIES ─────────────────────────────────
+    statBlock(weekStats.volume+'t', 'VOLUMEN',   W/4,    990, 1040);
+    vDivider(W/2, 870, 1080);
+    statBlock(weekStats.sets+'',    'SERIES',    W*3/4,  990, 1040);
 
-    ctx.fillStyle = '#555555';
-    ctx.font = '24px "Space Grotesk", monospace';
-    ctx.fillText('VOLUMEN', W / 4, 1120);
+    sep(1098);
 
-    // vertical divider
-    ctx.strokeStyle = '#1e1e1e';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(W / 2, 940); ctx.lineTo(W / 2, 1160);
-    ctx.stroke();
+    // ── ROW 2: RACHA | EJERCICIOS ───────────────────────────────
+    statBlock(weekStats.streak+'',          'RACHA',      W/4,   1214, 1264);
+    vDivider(W/2, 1116, 1282);
+    statBlock(weekStats.uniqueExercises+'', 'EJERCICIOS', W*3/4, 1214, 1264);
 
-    // ── SERIES (right) ──────────────────────────────────────────
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 100px Orbitron, monospace';
-    ctx.fillText(weekStats.sets.toString(), (W * 3) / 4, 1070);
-
-    ctx.fillStyle = '#555555';
-    ctx.font = '24px "Space Grotesk", monospace';
-    ctx.fillText('SERIES', (W * 3) / 4, 1120);
-
-    // ── LOWER SEPARATOR ─────────────────────────────────────────
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(100, 1200); ctx.lineTo(W - 100, 1200);
-    ctx.stroke();
+    sep(1308);
 
     // ── TOP MUSCLE ──────────────────────────────────────────────
     if (weekStats.topMuscle) {
-      ctx.fillStyle = '#555555';
-      ctx.font = '24px "Space Grotesk", monospace';
-      ctx.fillText('MÚSCULO DESTACADO', W / 2, 1300);
-
-      const muscleLabel = weekStats.topMuscle.toUpperCase();
-      ctx.font = 'bold 60px Orbitron, monospace';
-      const tw = ctx.measureText(muscleLabel).width;
-      const pH = 96, pW = tw + 80, pX = (W - pW) / 2, pY = 1330, pR = 14;
-
-      // pill bg
-      ctx.fillStyle = '#1a0d00';
-      ctx.beginPath();
-      ctx.moveTo(pX + pR, pY);
-      ctx.lineTo(pX + pW - pR, pY);
-      ctx.arcTo(pX + pW, pY, pX + pW, pY + pR, pR);
-      ctx.lineTo(pX + pW, pY + pH - pR);
-      ctx.arcTo(pX + pW, pY + pH, pX + pW - pR, pY + pH, pR);
-      ctx.lineTo(pX + pR, pY + pH);
-      ctx.arcTo(pX, pY + pH, pX, pY + pH - pR, pR);
-      ctx.lineTo(pX, pY + pR);
-      ctx.arcTo(pX, pY, pX + pR, pY, pR);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = '#ff9500';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.fillStyle = '#ff9500';
-      ctx.fillText(muscleLabel, W / 2, pY + 68);
+      ctx.fillStyle = '#454545';
+      ctx.font = '22px "Space Grotesk", monospace';
+      ctx.fillText('MÚSCULO DESTACADO', W/2, 1384);
+      pill(weekStats.topMuscle.toUpperCase(), 1406, '#ff9500', '#1a0d00', '#ff9500', 48);
     }
 
-    // ── BOTTOM SEPARATOR ────────────────────────────────────────
-    ctx.strokeStyle = '#30d158';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(100, H - 200); ctx.lineTo(W - 100, H - 200);
-    ctx.stroke();
+    const muscleBottom = weekStats.topMuscle ? 1510 : 1350;
+    sep(muscleBottom);
 
-    // ── USERNAME ────────────────────────────────────────────────
+    // ── PRs THIS WEEK ───────────────────────────────────────────
+    let prBottom = muscleBottom + 10;
+    if (weekStats.prs > 0) {
+      const prLabel = weekStats.prs === 1 ? '1 RÉCORD NUEVO' : weekStats.prs + ' RÉCORDS NUEVOS';
+      pill(prLabel, muscleBottom + 30, '#30d158', '#0a1f0f', '#30d158', 38);
+      prBottom = muscleBottom + 140;
+    }
+
+    // ── BEST LIFT ───────────────────────────────────────────────
+    if (weekStats.bestLift && weekStats.bestLift.weight > 0) {
+      const bl = weekStats.bestLift;
+      ctx.fillStyle = '#383838';
+      ctx.font = '21px "Space Grotesk", monospace';
+      ctx.fillText('MEJOR SERIE', W/2, prBottom + 60);
+
+      ctx.fillStyle = '#888888';
+      ctx.font = '28px "Space Grotesk", monospace';
+      ctx.fillText(bl.name, W/2, prBottom + 104);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 44px Orbitron, monospace';
+      ctx.fillText(bl.weight + 'kg × ' + bl.reps, W/2, prBottom + 164);
+    }
+
+    // ── FOOTER ──────────────────────────────────────────────────
+    sep(H - 210, '#30d158');
+
     if (userName) {
       ctx.fillStyle = '#404040';
       ctx.font = '26px "Space Grotesk", monospace';
-      ctx.fillText(userName, W / 2, H - 148);
+      ctx.fillText(userName, W/2, H - 152);
     }
 
-    // ── BRANDING ────────────────────────────────────────────────
-    ctx.fillStyle = '#2a2a2a';
-    ctx.font = '22px "Space Grotesk", monospace';
-    ctx.fillText('Tu progreso, tu récord · GymApp', W / 2, H - 108);
+    ctx.fillStyle = '#282828';
+    ctx.font = '21px "Space Grotesk", monospace';
+    ctx.fillText('Tu progreso, tu récord · GymApp', W/2, H - 112);
 
     // ── DOWNLOAD ────────────────────────────────────────────────
     const dataUrl = canvas.toDataURL('image/jpeg', 0.93);
     const a = document.createElement('a');
-    a.href = dataUrl;
+    a.href     = dataUrl;
     a.download = 'gymapp-rewind-' + weekStats.weekLabel.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() + '.jpg';
     document.body.appendChild(a);
     a.click();
