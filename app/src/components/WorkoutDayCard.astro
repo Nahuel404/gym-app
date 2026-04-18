@@ -3,7 +3,7 @@ interface Exercise {
   name: string;
   variant?: string;
   muscle: string;
-  sets: Array<{ weight: number; reps: number }>;
+  sets: Array<{ weight: number; reps: number; isPr?: boolean; prType?: string | null }>;
 }
 
 interface Day {
@@ -47,9 +47,10 @@ const { day, open = false } = Astro.props;
         <div class="exercise-muscle">{exercise.muscle}</div>
         <div class="sets-grid">
           {exercise.sets.map((set) => (
-            <div class="set-chip">
+            <div class:list={['set-chip', { 'set-chip--pr': set.isPr }]}>
               <span class="weight">{set.weight}kg</span>
               <span class="reps">x{set.reps}</span>
+              {set.isPr && <span class="pr-badge">PR</span>}
             </div>
           ))}
         </div>
@@ -272,6 +273,19 @@ const { day, open = false } = Astro.props;
   .set-chip .reps {
     color: var(--text-muted);
     margin-left: var(--space-1);
+  }
+
+  .set-chip--pr {
+    border-color: var(--accent-green);
+  }
+
+  .pr-badge {
+    font-family: var(--font-display);
+    font-size: 0.5rem;
+    color: var(--accent-green);
+    letter-spacing: 0.5px;
+    margin-left: var(--space-1);
+    vertical-align: middle;
   }
 </style>
 

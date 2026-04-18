@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { supabase } from '../../lib/supabase';
+import { detectPRs } from '../../lib/pr';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
@@ -56,38 +57,70 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // 2. Crear las series asociadas al workout
     let totalVolume = 0;
-    const historyRecords = [];
+    const historyRecords: any[] = [];
 
     for (const exercise of exercises) {
       for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
         const set = exercise.sets[setIndex];
-        const volume = set.weight * set.reps;
-        totalVolume += volume;
+        totalVolume += set.weight * set.reps;
 
         historyRecords.push({
           workout_id: workout.id,
           user_id: user.id,
           exercise_id: exercise.exercise_id,
-          sets: setIndex + 1, // Número de serie (1, 2, 3...)
+          sets: setIndex + 1,
           weight: set.weight,
           reps: set.reps,
           variant_equipment: exercise.equipment || null,
           variant_grip: exercise.grip || null,
           variant_position: exercise.position || null,
-          notes: null
+          notes: null,
+          is_pr: false,
+          pr_type: null,
         });
       }
     }
 
-    // 3. Insertar todas las series
-    const { data: sets, error: setsError } = await supabase
+    // 3. Detectar PRs antes de insertar
+    const exerciseIds = [...new Set(exercises.map((e: any) => e.exercise_id))];
+    const { data: exerciseData } = await supabase
+      .from('exercises')
+      .select('id, name')
+      .in('id', exerciseIds);
+    const nameMap = new Map(exerciseData?.map((e: any) => [e.id, e.name]) ?? []);
+
+    const { prs, annotations } = await detectPRs(
+      user.id,
+      exercises.map((ex: any) => ({
+        exercise_id: ex.exercise_id,
+        exerciseName: nameMap.get(ex.exercise_id) ?? 'Ejercicio',
+        equipment: ex.equipment ?? null,
+        grip: ex.grip ?? null,
+        position: ex.position ?? null,
+        sets: ex.sets,
+      }))
+    );
+
+    // Aplicar anotaciones de PR a los registros
+    let recordIdx = 0;
+    for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+      for (let setIdx = 0; setIdx < exercises[exIdx].sets.length; setIdx++) {
+        const ann = annotations[exIdx]?.[setIdx];
+        if (ann) {
+          historyRecords[recordIdx].is_pr = ann.is_pr;
+          historyRecords[recordIdx].pr_type = ann.pr_type;
+        }
+        recordIdx++;
+      }
+    }
+
+    // 4. Insertar todas las series
+    const { error: setsError } = await supabase
       .from('exercise_history')
-      .insert(historyRecords)
-      .select();
+      .insert(historyRecords);
 
     if (setsError) {
       console.error('Error guardando series:', setsError);
-      // Eliminar el workout si falla
       await supabase.from('workouts').delete().eq('id', workout.id);
       return new Response(JSON.stringify({ message: 'Error al guardar las series', error: setsError.message }), {
         status: 500,
@@ -99,7 +132,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       message: 'Entrenamiento guardado',
       workout_id: workout.id,
       totalVolume,
-      setsCount: historyRecords.length
+      setsCount: historyRecords.length,
+      prs,
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import PrCelebration from '../../components/PrCelebration.astro';
 import { supabase } from '../../lib/supabase';
 
 interface Exercise {
@@ -1811,8 +1812,13 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
         });
 
         if (response.ok) {
+          const data = await response.json();
           clearDraft();
-          window.location.href = '/?saved=true';
+          if (data.prs?.length > 0) {
+            (window as any).showPrModal(data.prs, '/?saved=true');
+          } else {
+            window.location.href = '/?saved=true';
+          }
         } else {
           const error = await response.json();
           console.error('Error del servidor:', error);
@@ -1828,5 +1834,7 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       }
     });
   </script>
+
+<PrCelebration />
 </Layout>
 

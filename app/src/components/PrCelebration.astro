@@ -1,0 +1,167 @@
+---
+// Hidden modal populated and shown by JS after a successful workout save.
+// Usage: include in page, then call window.showPrModal(prs, redirectUrl)
+---
+
+<div id="pr-modal" class="pr-modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="pr-modal-content">
+    <div class="pr-icon">◆</div>
+    <h2 class="pr-title">RECORD PERSONAL</h2>
+    <ul class="pr-list" id="pr-list"></ul>
+    <button id="pr-continue" class="pr-btn">CONTINUAR</button>
+  </div>
+</div>
+
+<style is:global>
+  .pr-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+  }
+
+  .pr-modal.open {
+    display: flex;
+  }
+
+  .pr-modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-green);
+    border-radius: 12px;
+    padding: var(--space-6);
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 0 40px var(--accent-green-soft);
+    animation: pr-appear 250ms ease;
+  }
+
+  @keyframes pr-appear {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .pr-icon {
+    font-size: 2rem;
+    color: var(--accent-green);
+    margin-bottom: var(--space-2);
+    animation: pr-pulse 1.8s ease infinite;
+  }
+
+  @keyframes pr-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  .pr-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    letter-spacing: 4px;
+    color: var(--accent-green);
+    margin: 0 0 var(--space-5);
+  }
+
+  .pr-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .pr-list li {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: var(--space-3);
+    text-align: left;
+  }
+
+  .pr-type-badge {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: var(--space-1);
+  }
+
+  .pr-exercise {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-1);
+  }
+
+  .pr-variant {
+    font-size: 0.7rem;
+    color: var(--accent-orange);
+    margin-bottom: var(--space-2);
+  }
+
+  .pr-values {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    color: var(--accent-green);
+    letter-spacing: 1px;
+  }
+
+  .pr-btn {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    letter-spacing: 2px;
+    background: var(--accent-green);
+    color: var(--text-dark);
+    border: none;
+    border-radius: 8px;
+    padding: var(--space-3) var(--space-6);
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+    width: 100%;
+  }
+
+  .pr-btn:hover {
+    opacity: 0.85;
+  }
+</style>
+
+<script>
+  const typeLabels: Record<string, string> = {
+    weight: 'Peso máximo',
+    '1rm': '1RM estimado',
+    reps: 'Máx repeticiones',
+  };
+  const typeUnits: Record<string, string> = {
+    weight: 'kg',
+    '1rm': 'kg (1RM)',
+    reps: 'reps',
+  };
+
+  (window as any).showPrModal = function (
+    prs: Array<{ exerciseName: string; variant: string; type: string; oldValue: number; newValue: number }>,
+    redirectUrl: string
+  ) {
+    const modal = document.getElementById('pr-modal')!;
+    const list = document.getElementById('pr-list')!;
+    const continueBtn = document.getElementById('pr-continue')!;
+
+    list.innerHTML = prs
+      .map(
+        pr => `
+        <li>
+          <div class="pr-type-badge">${typeLabels[pr.type] ?? pr.type}</div>
+          <div class="pr-exercise">${pr.exerciseName}</div>
+          ${pr.variant ? `<div class="pr-variant">${pr.variant}</div>` : ''}
+          <div class="pr-values">${pr.oldValue} → ${pr.newValue} ${typeUnits[pr.type] ?? ''}</div>
+        </li>`
+      )
+      .join('');
+
+    modal.setAttribute('aria-hidden', 'false');
+    modal.classList.add('open');
+    continueBtn.onclick = () => { window.location.href = redirectUrl; };
+  };
+</script>

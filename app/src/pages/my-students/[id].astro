@@ -45,6 +45,8 @@ const { data: workoutsData } = await supabase
       id,
       weight,
       reps,
+      is_pr,
+      pr_type,
       variant_equipment,
       variant_grip,
       variant_position,
@@ -97,7 +99,7 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
         name: sets[0].exercises?.name || 'Ejercicio',
         muscle: sets[0].exercises?.muscle_group || '',
         variant: variants.length > 0 ? variants.join(' · ') : '',
-        sets: sets.map((s: any) => ({ weight: s.weight, reps: s.reps }))
+        sets: sets.map((s: any) => ({ weight: s.weight, reps: s.reps, isPr: s.is_pr, prType: s.pr_type }))
       };
     })
   };
