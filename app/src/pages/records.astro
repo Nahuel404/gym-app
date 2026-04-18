@@ -1,0 +1,293 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { supabase } from '../lib/supabase';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+
+const { data: sets } = await supabase
+  .from('exercise_history')
+  .select(`
+    exercise_id,
+    weight,
+    reps,
+    variant_equipment,
+    variant_grip,
+    variant_position,
+    exercises (
+      id,
+      name,
+      muscle_group
+    )
+  `)
+  .eq('user_id', user.id);
+
+function epley(w: number, r: number) {
+  return r === 1 ? w : w * (1 + r / 30);
+}
+
+type Record = {
+  name: string;
+  muscle: string;
+  variant: string;
+  bestWeight: number;
+  bestReps: number;
+  best1rm: number;
+  isBodyweight: boolean;
+};
+
+const comboMap = new Map<string, Record>();
+
+sets?.forEach((s: any) => {
+  const key = `${s.exercise_id}|${s.variant_equipment ?? ''}|${s.variant_grip ?? ''}|${s.variant_position ?? ''}`;
+  const variantStr = [s.variant_equipment, s.variant_grip, s.variant_position].filter(Boolean).join(' · ');
+  const isBodyweight = s.weight === 0;
+  const est1rm = epley(s.weight, s.reps);
+
+  const existing = comboMap.get(key);
+  if (!existing) {
+    comboMap.set(key, {
+      name: s.exercises?.name ?? 'Ejercicio',
+      muscle: s.exercises?.muscle_group ?? '',
+      variant: variantStr,
+      bestWeight: s.weight,
+      bestReps: s.reps,
+      best1rm: est1rm,
+      isBodyweight,
+    });
+  } else {
+    if (isBodyweight) {
+      if (s.reps > existing.bestReps) existing.bestReps = s.reps;
+    } else {
+      if (s.weight > existing.bestWeight) {
+        existing.bestWeight = s.weight;
+        existing.bestReps = s.reps;
+      }
+      if (est1rm > existing.best1rm) existing.best1rm = est1rm;
+    }
+  }
+});
+
+const records = Array.from(comboMap.values()).sort((a, b) =>
+  a.muscle.localeCompare(b.muscle) || a.name.localeCompare(b.name)
+);
+
+const byMuscle = new Map<string, Record[]>();
+records.forEach(r => {
+  if (!byMuscle.has(r.muscle)) byMuscle.set(r.muscle, []);
+  byMuscle.get(r.muscle)!.push(r);
+});
+---
+
+<Layout title="Records" description="Tus mejores marcas por ejercicio.">
+<style>
+  .app-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  @media (min-width: 768px) {
+    .app-header { padding: var(--space-4) var(--space-6); }
+  }
+
+  .back-btn {
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-decoration: none;
+  }
+
+  .back-btn:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    letter-spacing: 1.5px;
+  }
+
+  main {
+    padding: var(--space-4);
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 768px) {
+    main { padding: var(--space-6); }
+  }
+
+  .page-header {
+    margin-bottom: var(--space-5);
+  }
+
+  .page-header h1 {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    letter-spacing: 2px;
+    margin-bottom: var(--space-2);
+  }
+
+  @media (min-width: 768px) {
+    .page-header h1 { font-size: 1.5rem; }
+  }
+
+  .page-header p {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .muscle-section {
+    margin-bottom: var(--space-6);
+  }
+
+  .muscle-title {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .muscle-count {
+    color: var(--accent-green);
+    font-size: 0.6rem;
+  }
+
+  .records-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  @media (min-width: 600px) {
+    .records-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (min-width: 900px) {
+    .records-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .record-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: var(--space-3);
+    transition: border-color var(--transition-fast);
+  }
+
+  .record-card:hover {
+    border-color: var(--border-light);
+  }
+
+  .record-name {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    margin-bottom: var(--space-1);
+    line-height: 1.3;
+  }
+
+  .record-variant {
+    font-size: 0.65rem;
+    color: var(--accent-orange);
+    margin-bottom: var(--space-3);
+  }
+
+  .record-main {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--accent-green);
+    margin-bottom: var(--space-1);
+    letter-spacing: 0.5px;
+  }
+
+  .record-sub {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-8);
+    color: var(--text-muted);
+  }
+
+  .empty-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    margin-bottom: var(--space-2);
+    color: var(--text-primary);
+  }
+
+  .empty-text { font-size: 0.875rem; }
+</style>
+
+<header class="app-header">
+  <a href="/" class="back-btn">&larr; Inicio</a>
+  <span class="page-title">RECORDS</span>
+</header>
+
+<main>
+  {records.length > 0 ? (
+    <>
+      <div class="page-header">
+        <h1>MIS RECORDS</h1>
+        <p>{records.length} ejercicio{records.length !== 1 ? 's' : ''} registrado{records.length !== 1 ? 's' : ''}</p>
+      </div>
+
+      {Array.from(byMuscle.entries()).map(([muscle, items]) => (
+        <section class="muscle-section">
+          <div class="muscle-title">
+            <span>{muscle}</span>
+            <span class="muscle-count">{items.length}</span>
+          </div>
+          <div class="records-grid">
+            {items.map(rec => (
+              <div class="record-card">
+                <div class="record-name">{rec.name}</div>
+                {rec.variant && <div class="record-variant">{rec.variant}</div>}
+                {rec.isBodyweight ? (
+                  <>
+                    <div class="record-main">×{rec.bestReps}</div>
+                    <div class="record-sub">MÁXIMO DE REPS</div>
+                  </>
+                ) : (
+                  <>
+                    <div class="record-main">{rec.bestWeight}kg × {rec.bestReps}</div>
+                    <div class="record-sub">1RM EST. ~{Math.round(rec.best1rm)}kg</div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  ) : (
+    <div class="empty-state">
+      <h2 class="empty-title">SIN RECORDS</h2>
+      <p class="empty-text">Completá tu primer entrenamiento para ver tus marcas acá.</p>
+    </div>
+  )}
+</main>
+</Layout>
