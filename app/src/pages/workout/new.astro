@@ -1815,7 +1815,7 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
           const data = await response.json();
           clearDraft();
           if (data.prs?.length > 0) {
-            (window as any).showPrModal(data.prs, '/?saved=true');
+            window.showPrModal(data.prs, '/?saved=true');
           } else {
             window.location.href = '/?saved=true';
           }
