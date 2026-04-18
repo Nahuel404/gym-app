@@ -128,18 +128,6 @@ const weekBestLift = weekBestSet?.exercises ? {
 const MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 const weekLabel = `${mondayOfWeek.getDate()} ${MONTHS[mondayOfWeek.getMonth()]} — ${sundayOfWeek.getDate()} ${MONTHS[sundayOfWeek.getMonth()]}`;
 
-const weekStats = {
-  days: weekDays,
-  volume: (weekVolume / 1000).toFixed(1),
-  sets: weekSetCount,
-  topMuscle: weekTopMuscle,
-  prs: weekPRs,
-  uniqueExercises: weekUniqueExercises,
-  streak: currentStreak,
-  bestLift: weekBestLift,
-  weekLabel,
-};
-
 // Calcular racha actual (días únicos, ordenados descendente)
 let currentStreak = 0;
 const sortedUniqueDates = uniqueDates
@@ -165,6 +153,18 @@ if (sortedUniqueDates.length > 0) {
     }
   }
 }
+
+const weekStats = {
+  days: weekDays,
+  volume: (weekVolume / 1000).toFixed(1),
+  sets: weekSetCount,
+  topMuscle: weekTopMuscle,
+  prs: weekPRs,
+  uniqueExercises: weekUniqueExercises,
+  streak: currentStreak,
+  bestLift: weekBestLift,
+  weekLabel,
+};
 
 const stats = {
   totalWorkouts,
