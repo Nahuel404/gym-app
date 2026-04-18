@@ -1,6 +1,5 @@
 ---
-import '../styles/global.css';
-import PwaHead from '../components/PwaHead.astro';
+import Layout from '../layouts/Layout.astro';
 
 const cookies = Astro.request.headers.get('cookie') || ''
 const hasSession = cookies.includes('session=')
@@ -9,14 +8,8 @@ if (hasSession) {
 }
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - GymApp</title>
-  <PwaHead />
-  <style>
+<Layout title="Login" description="Iniciá sesión en GymApp para registrar tus entrenamientos.">
+<style>
     .login-page {
       min-height: 100vh;
       display: flex;
@@ -165,8 +158,7 @@ if (hasSession) {
       letter-spacing: 1px;
     }
   </style>
-</head>
-<body>
+
   <div class="login-page">
     <div class="login-container">
       <div class="login-header">
@@ -271,5 +263,5 @@ if (hasSession) {
       }
     })
   </script>
-</body>
-</html>
+</Layout>
+

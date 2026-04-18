@@ -1,6 +1,6 @@
 ---
-import '../../styles/global.css';
-import PwaHead from '../../components/PwaHead.astro';
+import Layout from '../../layouts/Layout.astro';
+import WorkoutDayCard from '../../components/WorkoutDayCard.astro';
 import { supabase } from '../../lib/supabase';
 import { formatFullDate } from '../../lib/dates';
 
@@ -104,14 +104,8 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
 });
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Historial de {studentData.name} - GymApp</title>
-  <PwaHead />
-  <style>
+<Layout title={`Historial de ${studentData.name}`} description={`Sesiones registradas por ${studentData.name}.`}>
+<style>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -275,215 +269,6 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
       }
     }
 
-    .workout-day {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: var(--space-3);
-      overflow: hidden;
-    }
-
-    @media (min-width: 768px) {
-      .workout-day {
-        border-radius: 12px;
-        margin-bottom: var(--space-4);
-      }
-    }
-
-    .day-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: var(--space-3);
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-      transition: background var(--transition-fast);
-      gap: var(--space-2);
-    }
-
-    @media (min-width: 768px) {
-      .day-header {
-        padding: var(--space-4);
-      }
-    }
-
-    .day-header:hover {
-      background: var(--bg-tertiary);
-    }
-
-    .day-date {
-      font-family: var(--font-display);
-      font-size: 0.75rem;
-      letter-spacing: 0.8px;
-      text-transform: capitalize;
-    }
-
-    @media (min-width: 768px) {
-      .day-date {
-        font-size: 0.875rem;
-        letter-spacing: 1px;
-      }
-    }
-
-    .day-stats {
-      display: flex;
-      gap: var(--space-2);
-      flex-wrap: wrap;
-    }
-
-    @media (min-width: 768px) {
-      .day-stats {
-        gap: var(--space-4);
-      }
-    }
-
-    .day-stat {
-      font-size: 0.65rem;
-      color: var(--text-muted);
-    }
-
-    @media (min-width: 768px) {
-      .day-stat {
-        font-size: 0.75rem;
-      }
-    }
-
-    .day-stat span {
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-
-    .day-right {
-      display: flex;
-      gap: var(--space-2);
-      align-items: center;
-      flex-shrink: 0;
-    }
-
-    .day-volume {
-      font-family: var(--font-display);
-      font-size: 0.75rem;
-      color: var(--accent-green);
-    }
-
-    @media (min-width: 768px) {
-      .day-volume {
-        font-size: 0.875rem;
-      }
-    }
-
-    .day-toggle {
-      color: var(--text-muted);
-      font-size: 1.25rem;
-      transition: transform var(--transition-fast);
-    }
-
-    .workout-day.open .day-toggle {
-      transform: rotate(180deg);
-    }
-
-    .day-content {
-      display: none;
-      padding: var(--space-3);
-    }
-
-    @media (min-width: 768px) {
-      .day-content {
-        padding: var(--space-4);
-      }
-    }
-
-    .workout-day.open .day-content {
-      display: block;
-    }
-
-    .exercise-block {
-      margin-bottom: var(--space-3);
-    }
-
-    @media (min-width: 768px) {
-      .exercise-block {
-        margin-bottom: var(--space-4);
-      }
-    }
-
-    .exercise-block:last-child {
-      margin-bottom: 0;
-    }
-
-    .exercise-name {
-      font-size: 0.8rem;
-      color: var(--text-primary);
-      margin-bottom: var(--space-1);
-    }
-
-    @media (min-width: 768px) {
-      .exercise-name {
-        font-size: 0.875rem;
-      }
-    }
-
-    .exercise-variant {
-      font-size: 0.65rem;
-      color: var(--accent-orange);
-      margin-bottom: var(--space-1);
-    }
-
-    @media (min-width: 768px) {
-      .exercise-variant {
-        font-size: 0.7rem;
-      }
-    }
-
-    .exercise-muscle {
-      font-size: 0.6rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: var(--space-2);
-    }
-
-    @media (min-width: 768px) {
-      .exercise-muscle {
-        font-size: 0.65rem;
-        letter-spacing: 1px;
-        margin-bottom: var(--space-3);
-      }
-    }
-
-    .sets-grid {
-      display: flex;
-      gap: var(--space-2);
-      flex-wrap: wrap;
-    }
-
-    .set-chip {
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: var(--space-1) var(--space-2);
-      font-size: 0.7rem;
-    }
-
-    @media (min-width: 768px) {
-      .set-chip {
-        border-radius: 6px;
-        padding: var(--space-2) var(--space-3);
-        font-size: 0.75rem;
-      }
-    }
-
-    .set-chip .weight {
-      font-family: var(--font-display);
-      color: var(--text-primary);
-    }
-
-    .set-chip .reps {
-      color: var(--text-muted);
-      margin-left: var(--space-1);
-    }
-
     .empty-state {
       text-align: center;
       padding: var(--space-8);
@@ -501,8 +286,7 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
       font-size: 0.875rem;
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <div class="header-left">
       <a href="/my-students" class="back-btn">&larr; Mis Alumnos</a>
@@ -536,38 +320,7 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
         </div>
 
         {workoutDays.map((day, index) => (
-          <div class={`workout-day ${index === 0 ? 'open' : ''}`}>
-            <div class="day-header">
-              <div>
-                <div class="day-date">{day.formattedDate}</div>
-                <div class="day-stats">
-                  <span class="day-stat"><span>{day.exerciseCount}</span> ejercicios</span>
-                  <span class="day-stat"><span>{day.setCount}</span> series</span>
-                </div>
-              </div>
-              <div class="day-right">
-                <div class="day-volume">{(day.totalVolume / 1000).toFixed(1)}t</div>
-                <span class="day-toggle">v</span>
-              </div>
-            </div>
-            <div class="day-content">
-              {day.exercises.map((exercise) => (
-                <div class="exercise-block">
-                  <div class="exercise-name">{exercise.name}</div>
-                  {exercise.variant && <div class="exercise-variant">{exercise.variant}</div>}
-                  <div class="exercise-muscle">{exercise.muscle}</div>
-                  <div class="sets-grid">
-                    {exercise.sets.map((set) => (
-                      <div class="set-chip">
-                        <span class="weight">{set.weight}kg</span>
-                        <span class="reps">x{set.reps}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <WorkoutDayCard day={day} open={index === 0} />
         ))}
       </>
     ) : (
@@ -578,12 +331,5 @@ const workoutDays = Array.from(workoutsByDate.entries()).map(([date, dayWorkouts
     )}
   </main>
 
-  <script>
-    document.querySelectorAll('.day-header').forEach(header => {
-      header.addEventListener('click', () => {
-        header.closest('.workout-day')?.classList.toggle('open');
-      });
-    });
-  </script>
-</body>
-</html>
+</Layout>
+

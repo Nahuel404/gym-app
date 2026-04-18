@@ -1,0 +1,66 @@
+---
+type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type Size = 'sm' | 'md';
+
+interface Props {
+  variant?: Variant;
+  size?: Size;
+  type?: 'button' | 'submit' | 'reset';
+  href?: string;
+  id?: string;
+  disabled?: boolean;
+  class?: string;
+  [key: string]: any;
+}
+
+const {
+  variant = 'secondary',
+  size = 'md',
+  type = 'button',
+  href,
+  id,
+  disabled,
+  class: className = '',
+  ...rest
+} = Astro.props;
+
+const classes = ['btn', `btn-${variant}`, size === 'sm' ? 'btn-sm' : '', className]
+  .filter(Boolean)
+  .join(' ');
+---
+
+{href ? (
+  <a href={href} id={id} class={classes} {...rest}><slot /></a>
+) : (
+  <button type={type} id={id} disabled={disabled} class={classes} {...rest}><slot /></button>
+)}
+
+<style is:global>
+  .btn-sm {
+    padding: var(--space-2) var(--space-4);
+    font-size: 0.8rem;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+  }
+
+  a.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+
+  a.btn:hover {
+    color: inherit;
+  }
+</style>

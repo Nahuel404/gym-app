@@ -1,6 +1,5 @@
 ---
-import '../styles/global.css';
-import PwaHead from '../components/PwaHead.astro';
+import Layout from '../layouts/Layout.astro';
 import LineChart from '../components/charts/LineChart.astro';
 import BarChart from '../components/charts/BarChart.astro';
 import ProgressRing from '../components/charts/ProgressRing.astro';
@@ -406,14 +405,8 @@ const pendingTrainerCount = user?.is_trainer
   : 0;
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - GymApp</title>
-  <PwaHead />
-  <style>
+<Layout title="Dashboard" description="Tu panel de entrenamientos: estadísticas, racha y progreso.">
+<style>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -1542,8 +1535,7 @@ const pendingTrainerCount = user?.is_trainer
       letter-spacing: 0.5px;
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <div class="logo">
       GYMAPP
@@ -2224,5 +2216,5 @@ const pendingTrainerCount = user?.is_trainer
       window.location.href = '/login'
     })
   </script>
-</body>
-</html>
+</Layout>
+

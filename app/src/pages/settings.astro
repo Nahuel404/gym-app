@@ -1,6 +1,6 @@
 ---
-import '../styles/global.css';
-import PwaHead from '../components/PwaHead.astro';
+import Layout from '../layouts/Layout.astro';
+import Button from '../components/Button.astro';
 
 const user = Astro.locals.user;
 
@@ -9,14 +9,8 @@ if (!user) {
 }
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Configuración - GymApp</title>
-  <PwaHead />
-  <style>
+<Layout title="Configuración" description="Ajustes de tu cuenta y preferencias.">
+<style>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -320,8 +314,7 @@ if (!user) {
       border-radius: 4px;
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <div class="header-left">
       <a href="/" class="back-btn">&larr; Inicio</a>
@@ -366,8 +359,8 @@ if (!user) {
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-primary" id="generateBtn">Generar API Key</button>
-        <button class="btn btn-danger" id="revokeBtn" style="display: none;">Revocar</button>
+        <Button variant="primary" id="generateBtn">Generar API Key</Button>
+        <Button variant="danger" id="revokeBtn" style="display: none;">Revocar</Button>
       </div>
 
       <div class="status-msg" id="statusMsg"></div>
@@ -516,5 +509,5 @@ if (!user) {
       setTimeout(() => { trainerStatus.className = 'status-msg'; }, 3000);
     });
   </script>
-</body>
-</html>
+</Layout>
+

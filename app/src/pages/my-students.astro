@@ -1,6 +1,5 @@
 ---
-import '../styles/global.css';
-import PwaHead from '../components/PwaHead.astro';
+import Layout from '../layouts/Layout.astro';
 import { supabase } from '../lib/supabase';
 
 const user = Astro.locals.user;
@@ -85,14 +84,8 @@ function lastWorkoutAgo(dateStr: string | null): string {
 }
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mis Alumnos - GymApp</title>
-  <PwaHead />
-  <style>
+<Layout title="Mis Alumnos" description="Gestioná tus alumnos y revisá su progreso.">
+<style>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -522,8 +515,7 @@ function lastWorkoutAgo(dateStr: string | null): string {
       font-size: 0.875rem;
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <a href="/" class="logo">
       GYMAPP
@@ -763,5 +755,5 @@ function lastWorkoutAgo(dateStr: string | null): string {
       });
     });
   </script>
-</body>
-</html>
+</Layout>
+

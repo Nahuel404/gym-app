@@ -1,6 +1,5 @@
 ---
-import '../../styles/global.css';
-import PwaHead from '../../components/PwaHead.astro';
+import Layout from '../../layouts/Layout.astro';
 
 const user = Astro.locals.user
 
@@ -9,14 +8,8 @@ if (!user || user.role !== 'admin') {
 }
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Usuarios - GymApp</title>
-  <PwaHead />
-  <style is:global>
+<Layout title="Usuarios" description="Administración de usuarios.">
+<style is:global>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -421,8 +414,7 @@ if (!user || user.role !== 'admin') {
       }
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <div class="header-left">
       <a href="/" class="back-link">← Volver</a>
@@ -715,5 +707,5 @@ if (!user || user.role !== 'admin') {
     (window as any).deleteUser = deleteUser
     ;(window as any).openEditModal = openEditModal
   </script>
-</body>
-</html>
+</Layout>
+

@@ -1,6 +1,6 @@
 ---
-import '../styles/global.css';
-import PwaHead from '../components/PwaHead.astro';
+import Layout from '../layouts/Layout.astro';
+import Button from '../components/Button.astro';
 import { supabase } from '../lib/supabase';
 
 const user = Astro.locals.user;
@@ -46,14 +46,8 @@ const pendingTrainerCount = user.is_trainer
   : 0;
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Entrenadores - GymApp</title>
-  <PwaHead />
-  <style>
+<Layout title="Entrenadores" description="Conectá con un entrenador o gestioná tu coach actual.">
+<style>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -532,8 +526,7 @@ const pendingTrainerCount = user.is_trainer
       text-align: center;
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <a href="/" class="logo">
       GYMAPP
@@ -651,8 +644,8 @@ const pendingTrainerCount = user.is_trainer
       <h3>ENVIAR SOLICITUD</h3>
       <textarea id="requestMessage" placeholder="Mensaje opcional para el entrenador..."></textarea>
       <div class="modal-actions">
-        <button class="btn-sm btn-secondary" id="cancelModal">Cancelar</button>
-        <button class="btn-sm btn-primary" id="confirmRequest">Enviar</button>
+        <Button size="sm" variant="secondary" id="cancelModal">Cancelar</Button>
+        <Button size="sm" variant="primary" id="confirmRequest">Enviar</Button>
       </div>
     </div>
   </div>
@@ -813,5 +806,5 @@ const pendingTrainerCount = user.is_trainer
       });
     });
   </script>
-</body>
-</html>
+</Layout>
+

@@ -1,6 +1,5 @@
 ---
-import '../styles/global.css';
-import PwaHead from '../components/PwaHead.astro';
+import Layout from '../layouts/Layout.astro';
 import { supabase } from '../lib/supabase';
 
 const user = Astro.locals.user;
@@ -49,14 +48,8 @@ const gripOptions = ['Prono', 'Supino', 'Neutro', 'Ancho', 'Cerrado', 'Mixto'];
 const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostado'];
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Favoritos - GymApp</title>
-  <PwaHead />
-  <style>
+<Layout title="Favoritos" description="Tus ejercicios favoritos a un click de distancia.">
+<style>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -411,8 +404,7 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       display: none;
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <div class="header-left">
       <a href="/" class="back-btn">← Volver</a>
@@ -665,5 +657,5 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       });
     });
   </script>
-</body>
-</html>
+</Layout>
+

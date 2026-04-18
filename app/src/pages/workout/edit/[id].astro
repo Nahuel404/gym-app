@@ -1,6 +1,5 @@
 ---
-import '../../../styles/global.css';
-import PwaHead from '../../../components/PwaHead.astro';
+import Layout from '../../../layouts/Layout.astro';
 import { supabase } from '../../../lib/supabase';
 
 const user = Astro.locals.user;
@@ -95,14 +94,8 @@ workout.exercise_history?.forEach((hist: any) => {
 const workoutExercisesData = Array.from(exercisesMap.values());
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Editar Entrenamiento - GymApp</title>
-  <PwaHead />
-  <style is:global>
+<Layout title="Editar Entrenamiento" description="Modificá los detalles de tu sesión.">
+<style is:global>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -844,8 +837,7 @@ const workoutExercisesData = Array.from(exercisesMap.values());
       opacity: 1;
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <div class="header-left">
       <a href="/history" class="back-btn">← Volver</a>
@@ -1487,5 +1479,5 @@ const workoutExercisesData = Array.from(exercisesMap.values());
       }
     });
   </script>
-</body>
-</html>
+</Layout>
+

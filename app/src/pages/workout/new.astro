@@ -1,6 +1,5 @@
 ---
-import '../../styles/global.css';
-import PwaHead from '../../components/PwaHead.astro';
+import Layout from '../../layouts/Layout.astro';
 import { supabase } from '../../lib/supabase';
 
 interface Exercise {
@@ -38,14 +37,8 @@ const gripOptions = ['Prono', 'Supino', 'Neutro', 'Ancho', 'Cerrado', 'Mixto'];
 const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostado'];
 ---
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nuevo Entrenamiento - GymApp</title>
-  <PwaHead />
-  <style is:global>
+<Layout title="Nuevo Entrenamiento" description="Registrá una nueva sesión de entrenamiento.">
+<style is:global>
     .app-header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -1127,8 +1120,7 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       }
     }
   </style>
-</head>
-<body>
+
   <header class="app-header">
     <div class="header-left">
       <a href="/" class="back-btn">← Volver</a>
@@ -1836,5 +1828,5 @@ const positionOptions = ['De Pie', 'Sentado', 'Inclinado', 'Declinado', 'Acostad
       }
     });
   </script>
-</body>
-</html>
+</Layout>
+

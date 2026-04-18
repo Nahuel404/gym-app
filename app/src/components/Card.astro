@@ -1,0 +1,26 @@
+---
+type Padding = 'sm' | 'md' | 'lg' | 'none';
+
+interface Props {
+  padding?: Padding;
+  as?: string;
+  class?: string;
+  [key: string]: any;
+}
+
+const { padding = 'md', as = 'div', class: className = '', ...rest } = Astro.props;
+
+const paddingMap: Record<Padding, string> = {
+  none: '0',
+  sm: 'var(--space-3)',
+  md: 'var(--space-5)',
+  lg: 'var(--space-6)',
+};
+
+const Tag = as;
+const style = `padding: ${paddingMap[padding]};`;
+---
+
+<Tag class:list={['card', className]} style={style} {...rest}>
+  <slot />
+</Tag>
