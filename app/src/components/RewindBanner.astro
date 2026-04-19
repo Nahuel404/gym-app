@@ -38,6 +38,22 @@ const { weekStats, userName } = Astro.props;
   </div>
 </div>
 
+<!-- Preview modal -->
+<div id="rewind-preview" class="rw-preview" aria-hidden="true" aria-modal="true" role="dialog">
+  <button class="rw-preview-close" id="rw-preview-close" aria-label="Cerrar">×</button>
+  <div class="rw-preview-inner">
+    <img id="rw-preview-img" class="rw-preview-img" src="" alt="Vista previa Rewind" />
+    <div class="rw-preview-actions">
+      <button id="rw-download-btn" class="rw-action-btn rw-action-secondary">
+        <span class="rw-action-icon">↓</span> DESCARGAR
+      </button>
+      <button id="rw-share-btn" class="rw-action-btn rw-action-primary">
+        <span class="rw-action-icon">↑</span> COMPARTIR
+      </button>
+    </div>
+  </div>
+</div>
+
 <style is:global>
   .rewind-banner {
     display: none;
@@ -116,6 +132,112 @@ const { weekStats, userName } = Astro.props;
     0%   { background-position: -100% 0; }
     100% { background-position: 200% 0; }
   }
+
+  /* ── Preview modal ─────────────────────────────────────────── */
+  .rw-preview {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    animation: rw-fade-in 200ms ease;
+  }
+  .rw-preview.open { display: flex; }
+
+  @keyframes rw-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .rw-preview-close {
+    position: fixed;
+    top: var(--space-4);
+    right: var(--space-4);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    z-index: 10;
+  }
+  .rw-preview-close:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+
+  .rw-preview-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    max-height: 100vh;
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .rw-preview-img {
+    width: auto;
+    max-height: 72vh;
+    aspect-ratio: 9 / 16;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+    object-fit: cover;
+    animation: rw-img-in 250ms ease;
+  }
+
+  @keyframes rw-img-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .rw-preview-actions {
+    display: flex;
+    gap: var(--space-3);
+    width: 100%;
+  }
+
+  .rw-action-btn {
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid;
+    transition: opacity var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+  .rw-action-btn:hover    { opacity: 0.8; }
+  .rw-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .rw-action-secondary {
+    background: transparent;
+    color: var(--text-primary);
+    border-color: var(--border-light);
+  }
+  .rw-action-primary {
+    background: var(--accent-green);
+    color: var(--text-dark);
+    border-color: var(--accent-green);
+  }
+
+  .rw-action-icon { font-size: 1rem; line-height: 1; }
 </style>
 
 <script define:vars={{ weekStats, userName }}>
@@ -142,12 +264,53 @@ const { weekStats, userName } = Astro.props;
     generateBtn.disabled = true;
     btnText.textContent  = 'GENERANDO...';
     try {
-      await generateRewindImage();
+      const result = await generateRewindImage();
+      showPreview(result.dataUrl, result.blob);
     } finally {
       generateBtn.disabled = false;
       btnText.textContent  = 'COMPARTIR';
     }
   });
+
+  function showPreview(dataUrl, blob) {
+    const modal       = document.getElementById('rewind-preview');
+    const img         = document.getElementById('rw-preview-img');
+    const closeBtn    = document.getElementById('rw-preview-close');
+    const downloadBtn = document.getElementById('rw-download-btn');
+    const shareBtn    = document.getElementById('rw-share-btn');
+
+    img.src = dataUrl;
+    modal.classList.add('open');
+    modal.removeAttribute('aria-hidden');
+
+    const filename = 'gymapp-rewind-' + weekStats.weekLabel.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() + '.jpg';
+
+    // Mostrar botón compartir solo si el browser lo soporta con archivos
+    var canShare = !!(navigator.share && navigator.canShare &&
+      navigator.canShare({ files: [new File([], 'x.jpg', { type: 'image/jpeg' })] }));
+    shareBtn.style.display = canShare ? '' : 'none';
+    if (!canShare) downloadBtn.style.flex = '1 1 100%';
+
+    downloadBtn.onclick = () => {
+      var a = document.createElement('a');
+      a.href = dataUrl; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
+
+    shareBtn.onclick = async () => {
+      var file = new File([blob], filename, { type: 'image/jpeg' });
+      try { await navigator.share({ files: [file], title: 'Mi Rewind Semanal · GymApp' }); }
+      catch (_) { /* usuario canceló */ }
+    };
+
+    function close() {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      img.src = '';
+    }
+    closeBtn.onclick = close;
+    modal.onclick = (e) => { if (e.target === modal) close(); };
+  }
 
   // ─────────────────────────────────────────────────────────────
   //  8 FIXED ZONES — nothing overflows, all info included
@@ -341,11 +504,11 @@ const { weekStats, userName } = Astro.props;
     ctx.font = '20px "Space Grotesk", monospace';
     ctx.fillText('Tu progreso, tu récord · GymApp', W/2, 1876);
 
-    // ── DOWNLOAD ─────────────────────────────────────────────────
+    // ── RETURN dataUrl + blob ────────────────────────────────────
     var dataUrl = canvas.toDataURL('image/jpeg', 0.93);
-    var a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'gymapp-rewind-' + weekStats.weekLabel.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() + '.jpg';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    var blob = await new Promise(function(resolve) {
+      canvas.toBlob(resolve, 'image/jpeg', 0.93);
+    });
+    return { dataUrl: dataUrl, blob: blob };
   }
 </script>
